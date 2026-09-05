@@ -119,6 +119,7 @@
   }
   .fab.ghost { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
   .fab.on { background: var(--danger); color: #fff; }
+  .fab.alt { background: #4ab0e0; color: #06211c; }
 </style>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700&family=JetBrains+Mono:wght@400;500&display=swap">
 
@@ -149,6 +150,7 @@
   </div>
 
   <div class="fab-row">
+    <button id="fabPlaneMode" class="fab ghost" title="Modo: seleccionar el plano completo de un vistazo (toca para cambiar a pincel manual)">🧱</button>
     <button id="fabErase" class="fab ghost" title="Goma (borrar)">⌫</button>
     <button id="fabVR" class="fab ghost" title="Entrar en modo VR">🥽</button>
     <button id="fabSheet" class="fab" title="Zonas y materiales">☰</button>
@@ -216,6 +218,7 @@
   var sheet = document.getElementById('sheet');
   var fabSheet = document.getElementById('fabSheet');
   var fabErase = document.getElementById('fabErase');
+  var fabPlaneMode = document.getElementById('fabPlaneMode');
   var fabVR = document.getElementById('fabVR');
   var btnRecenter = document.getElementById('btnRecenter');
   var btnExitVR = document.getElementById('btnExitVR');
@@ -253,6 +256,14 @@
   var grid = new Map();     // 'x,y,z' -> [globalId,...]
   var CELL = 0.25;
   var paintMeshes = [];     // {mesh, colorAttr}
+
+  // Detección de planos: agrupa triángulos vecinos y casi-coplanares en
+  // "superficies" (un muro, un piso...) para poder seleccionarlas de un
+  // solo golpe en vez de pintarlas triángulo por triángulo.
+  var planes = [];              // {gids:[], area, normal, origin, tint}
+  var triPlane = new Map();     // globalId -> índice en `planes`
+  var triBaseColor = new Map(); // globalId -> [r,g,b] color de reposo (tinte del plano)
+  var manualBrush = false;      // false = tocar/mirar selecciona el plano completo; true = pincel manual
 
   function cellKey(x, y, z) {
     return Math.round(x / CELL) + ',' + Math.round(y / CELL) + ',' + Math.round(z / CELL);
@@ -493,6 +504,7 @@
     // limpiar escaneo anterior
     while (scanRoot.children.length) scanRoot.remove(scanRoot.children[0]);
     triMeta = []; triOwner.clear(); grid.clear(); paintMeshes = [];
+    planes = []; triPlane.clear(); triBaseColor.clear();
     zonas = []; activeZonaId = null; renderZonaList(); updatePillZona();
 
     root.updateMatrixWorld(true);
@@ -544,6 +556,14 @@
       }
     });
 
+    detectPlanes(0, paintMeshes.length);
+    var touchedInit = new Set();
+    triBaseColor.forEach(function (rgb, gid) {
+      setTriColor(gid, null);
+      touchedInit.add(triMeta[gid].meshIdx);
+    });
+    touchedInit.forEach(function (mi) { paintMeshes[mi].colorAttr.needsUpdate = true; });
+
     // Un escaneo de interior se recorre desde ADENTRO, no se ve como un
     // objeto de afuera — colocamos el punto de vista al centro del cuarto,
     // a una altura de ojos típica sobre el piso (parte inferior del cajón).
@@ -555,7 +575,163 @@
     applyFlatLook();
   }
 
-  // ================= pintado por radio =================
+  // ================= detección de planos =================
+  // Un muro/piso/techo real es un plano; la malla del escaneo es solo una
+  // aproximación ruidosa de eso. Agrupamos triángulos vecinos (comparten
+  // arista) y casi-coplanares en "regiones" para poder seleccionar una
+  // superficie completa de un solo vistazo, en vez de pintarla a pincel
+  // triángulo por triángulo.
+  var PLANE_ANGLE_COS = Math.cos(THREE.MathUtils.degToRad(15)); // tolerancia de ángulo entre normales
+  var PLANE_DIST_THRESH = 0.04; // 4cm de tolerancia sobre el plano ajustado (ruido típico de LiDAR)
+  var PLANE_MIN_AREA = 0.25;    // m² — por debajo de esto no vale la pena el "un solo click"
+  var PLANE_TINTS = [[0.80, 0.85, 0.83], [0.72, 0.78, 0.76], [0.84, 0.80, 0.74], [0.76, 0.80, 0.86]];
+
+  function vKey(x, y, z) {
+    return Math.round(x * 1000) + '_' + Math.round(y * 1000) + '_' + Math.round(z * 1000);
+  }
+
+  function detectPlanes(meshStart, meshEnd) {
+    var normals = new Map();  // gid -> THREE.Vector3 (normal unitaria)
+    var edgeMap = new Map();  // 'vkeyA|vkeyB' -> [gid,...] triángulos que tocan esa arista
+    var a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+
+    for (var mi = meshStart; mi < meshEnd; mi++) {
+      var pm = paintMeshes[mi];
+      var pos = pm.mesh.geometry.attributes.position;
+      var triGlobalIds = pm.triGlobalIds;
+      var triCount = pos.count / 3;
+      for (var t = 0; t < triCount; t++) {
+        var gid = triGlobalIds[t];
+        var i0 = t * 3;
+        a.fromBufferAttribute(pos, i0); b.fromBufferAttribute(pos, i0 + 1); c.fromBufferAttribute(pos, i0 + 2);
+        var nrm = new THREE.Vector3().subVectors(b, a).cross(new THREE.Vector3().subVectors(c, a));
+        var len = nrm.length();
+        normals.set(gid, len > 1e-9 ? nrm.multiplyScalar(1 / len) : new THREE.Vector3());
+
+        var k0 = vKey(a.x, a.y, a.z), k1 = vKey(b.x, b.y, b.z), k2 = vKey(c.x, c.y, c.z);
+        [[k0, k1], [k1, k2], [k2, k0]].forEach(function (pair) {
+          var key = pair[0] < pair[1] ? pair[0] + '|' + pair[1] : pair[1] + '|' + pair[0];
+          var arr = edgeMap.get(key);
+          if (!arr) { arr = []; edgeMap.set(key, arr); }
+          arr.push(gid);
+        });
+      }
+    }
+
+    // adyacencia triángulo-triángulo: dos triángulos que comparten una arista
+    var neighbors = new Map(); // gid -> [gid,...]
+    edgeMap.forEach(function (gids) {
+      if (gids.length < 2) return;
+      for (var i = 0; i < gids.length; i++) {
+        for (var j = 0; j < gids.length; j++) {
+          if (i === j) continue;
+          var arr = neighbors.get(gids[i]);
+          if (!arr) { arr = []; neighbors.set(gids[i], arr); }
+          arr.push(gids[j]);
+        }
+      }
+    });
+
+    // crecimiento de región (BFS) sobre triángulos vecinos y casi-coplanares
+    var visited = new Set();
+    var allGids = Array.from(normals.keys());
+    for (var idx = 0; idx < allGids.length; idx++) {
+      var seed = allGids[idx];
+      if (visited.has(seed)) continue;
+      var seedN = normals.get(seed);
+      if (seedN.lengthSq() < 0.5) { visited.add(seed); continue; } // triángulo degenerado
+
+      var regionGids = [seed];
+      visited.add(seed);
+      var m0 = triMeta[seed];
+      var normalAcc = seedN.clone();
+      var areaAcc = m0.area;
+      var centroidAcc = new THREE.Vector3(m0.cx, m0.cy, m0.cz).multiplyScalar(m0.area);
+      var queue = [seed], qi = 0;
+      while (qi < queue.length) {
+        var cur = queue[qi++];
+        var nbrs = neighbors.get(cur);
+        if (!nbrs) continue;
+        var curNormal = normalAcc.clone().normalize();
+        var curOrigin = centroidAcc.clone().multiplyScalar(1 / areaAcc);
+        for (var k = 0; k < nbrs.length; k++) {
+          var nb = nbrs[k];
+          if (visited.has(nb)) continue;
+          var nN = normals.get(nb);
+          if (nN.lengthSq() < 0.5) { visited.add(nb); continue; }
+          if (Math.abs(nN.dot(curNormal)) < PLANE_ANGLE_COS) continue;
+          var mnb = triMeta[nb];
+          var dist = Math.abs((mnb.cx - curOrigin.x) * curNormal.x + (mnb.cy - curOrigin.y) * curNormal.y + (mnb.cz - curOrigin.z) * curNormal.z);
+          if (dist > PLANE_DIST_THRESH) continue;
+
+          visited.add(nb);
+          regionGids.push(nb);
+          queue.push(nb);
+          var wArea = mnb.area;
+          var alignedN = nN.dot(curNormal) < 0 ? nN.clone().negate() : nN;
+          normalAcc.addScaledVector(alignedN, wArea);
+          areaAcc += wArea;
+          centroidAcc.addScaledVector(new THREE.Vector3(mnb.cx, mnb.cy, mnb.cz), wArea);
+        }
+      }
+
+      if (areaAcc >= PLANE_MIN_AREA) {
+        var planeIdx = planes.length;
+        planes.push({
+          gids: regionGids, area: areaAcc,
+          normal: normalAcc.clone().normalize(),
+          origin: centroidAcc.clone().multiplyScalar(1 / areaAcc),
+          tint: -1
+        });
+        regionGids.forEach(function (g) { triPlane.set(g, planeIdx); });
+      }
+    }
+
+    // adyacencia entre PLANOS (para que dos superficies contiguas no
+    // queden con el mismo tinte) + coloreado voraz con una paleta chica
+    var planeAdj = planes.map(function () { return new Set(); });
+    edgeMap.forEach(function (gids) {
+      for (var i = 0; i < gids.length; i++) {
+        var pi = triPlane.get(gids[i]);
+        if (pi === undefined) continue;
+        for (var j = 0; j < gids.length; j++) {
+          if (i === j) continue;
+          var pj = triPlane.get(gids[j]);
+          if (pj === undefined || pj === pi) continue;
+          planeAdj[pi].add(pj);
+        }
+      }
+    });
+    for (var pIdx = 0; pIdx < planes.length; pIdx++) {
+      var used = new Set();
+      planeAdj[pIdx].forEach(function (adjIdx) {
+        if (planes[adjIdx].tint !== -1) used.add(planes[adjIdx].tint);
+      });
+      var choice = 0;
+      while (used.has(choice) && choice < PLANE_TINTS.length - 1) choice++;
+      planes[pIdx].tint = choice;
+    }
+    planes.forEach(function (pl) {
+      var rgb = PLANE_TINTS[pl.tint];
+      pl.gids.forEach(function (g) { triBaseColor.set(g, rgb); });
+    });
+  }
+
+  // ================= pintado =================
+  function applyOwner(gid, zonaIdOrErase, touched, reAdd) {
+    var prevZona = triOwner.get(gid);
+    if (prevZona === zonaIdOrErase) return;
+    if (prevZona !== undefined) reAdd.add(prevZona);
+    if (zonaIdOrErase === null) {
+      triOwner.delete(gid);
+    } else {
+      triOwner.set(gid, zonaIdOrErase);
+      reAdd.add(zonaIdOrErase);
+    }
+    setTriColor(gid, zonaIdOrErase);
+    touched.add(triMeta[gid].meshIdx);
+  }
+
   // forceGid: id global del triángulo exactamente golpeado por el rayo —
   // se incluye SIEMPRE, sin importar la distancia de su centroide al punto.
   // Esto importa porque en mallas con triángulos grandes (zonas planas
@@ -567,22 +743,7 @@
     var touched = new Set();
     var reAdd = new Set(); // zonaId set cuyas áreas cambiaron
 
-    function apply(gid) {
-      var m = triMeta[gid];
-      var prevZona = triOwner.get(gid);
-      if (prevZona === zonaIdOrErase) return;
-      if (prevZona !== undefined) reAdd.add(prevZona);
-      if (zonaIdOrErase === null) {
-        triOwner.delete(gid);
-      } else {
-        triOwner.set(gid, zonaIdOrErase);
-        reAdd.add(zonaIdOrErase);
-      }
-      setTriColor(m, zonaIdOrErase);
-      touched.add(m.meshIdx);
-    }
-
-    if (forceGid !== undefined && forceGid !== null) apply(forceGid);
+    if (forceGid !== undefined && forceGid !== null) applyOwner(forceGid, zonaIdOrErase, touched, reAdd);
 
     var minCx = point.x - radius, maxCx = point.x + radius;
     var minCy = point.y - radius, maxCy = point.y + radius;
@@ -602,7 +763,7 @@
             var m = triMeta[gid];
             var dx = m.cx - point.x, dy = m.cy - point.y, dz = m.cz - point.z;
             if (dx * dx + dy * dy + dz * dz > r2) continue;
-            apply(gid);
+            applyOwner(gid, zonaIdOrErase, touched, reAdd);
           }
         }
       }
@@ -611,9 +772,20 @@
     if (reAdd.size) recomputeAreas();
   }
 
-  function setTriColor(m, zonaId) {
+  // seleccionar TODA una región/plano detectado de un solo golpe
+  function paintPlane(planeIdx, zonaIdOrErase) {
+    var pl = planes[planeIdx];
+    if (!pl) return;
+    var touched = new Set(), reAdd = new Set();
+    pl.gids.forEach(function (gid) { applyOwner(gid, zonaIdOrErase, touched, reAdd); });
+    touched.forEach(function (mi) { paintMeshes[mi].colorAttr.needsUpdate = true; });
+    if (reAdd.size) recomputeAreas();
+  }
+
+  function setTriColor(gid, zonaId) {
+    var m = triMeta[gid];
     var colorAttr = paintMeshes[m.meshIdx].colorAttr;
-    var col = zonaId === null ? [1, 1, 1] : hexToRgbArr(zonas.find(function (z) { return z.id === zonaId; }).colorHex);
+    var col = zonaId === null ? (triBaseColor.get(gid) || [1, 1, 1]) : hexToRgbArr(zonas.find(function (z) { return z.id === zonaId; }).colorHex);
     var i0 = m.tri * 3;
     colorAttr.setXYZ(i0, col[0], col[1], col[2]);
     colorAttr.setXYZ(i0 + 1, col[0], col[1], col[2]);
@@ -653,6 +825,7 @@
         activeZonaId = z.id;
         renderZonaList();
         updatePillZona();
+        resetDwell();
       });
       zonaList.appendChild(row);
     });
@@ -662,13 +835,14 @@
   }
   function eliminarZona(id) {
     triOwner.forEach(function (zonaId, gid) {
-      if (zonaId === id) { setTriColor(triMeta[gid], null); triOwner.delete(gid); }
+      if (zonaId === id) { setTriColor(gid, null); triOwner.delete(gid); }
     });
     paintMeshes.forEach(function (pm) { pm.colorAttr.needsUpdate = true; });
     zonas = zonas.filter(function (z) { return z.id !== id; });
     if (activeZonaId === id) activeZonaId = zonas.length ? zonas[0].id : null;
     renderZonaList();
     updatePillZona();
+    resetDwell();
   }
   function updatePillZona() {
     var z = zonas.find(function (zz) { return zz.id === activeZonaId; });
@@ -700,12 +874,24 @@
     zonaForm.hidden = true;
     renderZonaList();
     updatePillZona();
+    resetDwell();
   });
 
   fabErase.addEventListener('click', function () {
     eraseMode = !eraseMode;
     fabErase.classList.toggle('on', eraseMode);
     updatePillZona();
+    resetDwell();
+  });
+
+  fabPlaneMode.addEventListener('click', function () {
+    manualBrush = !manualBrush;
+    fabPlaneMode.textContent = manualBrush ? '🖌️' : '🧱';
+    fabPlaneMode.title = manualBrush
+      ? 'Modo: pincel manual (toca para volver a seleccionar el plano completo)'
+      : 'Modo: seleccionar el plano completo de un vistazo (toca para cambiar a pincel manual)';
+    fabPlaneMode.classList.toggle('alt', manualBrush);
+    resetDwell();
   });
 
   brushInput.addEventListener('input', function () {
@@ -715,9 +901,11 @@
 
   fabSheet.addEventListener('click', function () {
     sheet.hidden = !sheet.hidden;
+    resetDwell();
   });
   document.getElementById('sheetHandle').addEventListener('click', function () {
     sheet.hidden = true;
+    resetDwell();
   });
 
   // ================= calibración de escala =================
@@ -835,25 +1023,47 @@
     sheet.hidden = true;
     btnRecenter.hidden = false; btnExitVR.hidden = false;
     yawOffsetDeg = latest.alpha || 0;
-    dwellPoint = null; dwellMs = 0; painting = false;
+    resetDwell();
     requestFullscreenBestEffort(toolEl);
   }
   btnExitVR.addEventListener('click', enterFlatMode);
   btnRecenter.addEventListener('click', function () { yawOffsetDeg = latest.alpha || 0; });
 
   // ================= pintado por mirada (modo VR, sin control de manos) =================
-  var dwellPoint = null, dwellMs = 0, painting = false;
-  var DWELL_MS = 450, STEADY_EPS = 0.05;
+  var dwellPoint = null, dwellMs = 0, painting = false, dwellFired = false;
+  // Seleccionar un plano ENTERO de un vistazo es una acción más grande que
+  // pintar un parche de pincel, así que le pedimos un poco más de tiempo
+  // de mirada fija — reduce el riesgo de marcar sin querer un muro
+  // completo justo al cerrar el menú y quedarse quieto un instante.
+  var DWELL_MS = 450, PLANE_DWELL_MS = 700, STEADY_EPS = 0.05;
   var vrRaycaster = new THREE.Raycaster();
   var lastT = performance.now();
 
+  // Cualquier interacción con el menú (crear/elegir/borrar zona, cambiar de
+  // goma/pincel, etc.) reinicia el "dwell" — así, al volver a mirar la
+  // escena, siempre se necesita un tramo completo de mirada fija antes de
+  // pintar algo, en vez de aprovechar un tiempo ya acumulado sin querer
+  // mientras el usuario todavía tenía la atención puesta en el menú.
+  function resetDwell() { dwellPoint = null; dwellMs = 0; painting = false; dwellFired = false; }
+
   function updateGaze(dt) {
+    // mientras el menú de zonas está abierto, la atención del usuario está
+    // en la hoja inferior, no apuntando al escaneo — sin esto, un dwell
+    // acumulado "sin querer" mientras se llena el formulario de una zona
+    // nueva podía pintar de golpe lo que sea que estuviera al frente en
+    // ese momento (mucho más grave ahora que un solo dwell puede pintar
+    // un plano ENTERO en vez de solo un parche de pincel).
+    if (!sheet.hidden) {
+      dwellPoint = null; dwellMs = 0; painting = false; dwellFired = false;
+      drawReticle('#e7efec'); reticleTex.needsUpdate = true;
+      return;
+    }
     var origin = new THREE.Vector3(); rig.getWorldPosition(origin);
     var dir = new THREE.Vector3(0, 0, -1).applyQuaternion(rig.quaternion);
     vrRaycaster.set(origin, dir);
     var hits = vrRaycaster.intersectObjects(scanRoot.children, true);
     if (!hits.length || (!zonas.length && !eraseMode)) {
-      dwellPoint = null; dwellMs = 0; painting = false;
+      dwellPoint = null; dwellMs = 0; painting = false; dwellFired = false;
       drawReticle('#e7efec'); reticleTex.needsUpdate = true;
       return;
     }
@@ -861,16 +1071,31 @@
     if (dwellPoint && p.distanceTo(dwellPoint) < STEADY_EPS) {
       dwellMs += dt;
     } else {
-      dwellPoint = p.clone(); dwellMs = 0; painting = false;
+      dwellPoint = p.clone(); dwellMs = 0; painting = false; dwellFired = false;
     }
-    if (dwellMs >= DWELL_MS) {
+
+    var hitMeshIdx = hits[0].object.userData.meshIdx;
+    var forceGid = (hitMeshIdx !== undefined) ? paintMeshes[hitMeshIdx].triGlobalIds[hits[0].faceIndex] : undefined;
+    var planeIdx = (!manualBrush && forceGid !== undefined) ? triPlane.get(forceGid) : undefined;
+    var neededMs = planeIdx !== undefined ? PLANE_DWELL_MS : DWELL_MS;
+
+    if (dwellMs >= neededMs) {
       painting = true;
-      var hitMeshIdx = hits[0].object.userData.meshIdx;
-      var forceGid = (hitMeshIdx !== undefined) ? paintMeshes[hitMeshIdx].triGlobalIds[hits[0].faceIndex] : undefined;
-      paintAt(p, brushRadius, eraseMode ? null : activeZonaId, forceGid);
+      if (planeIdx !== undefined) {
+        // modo plano: seleccionar la superficie COMPLETA de un golpe —
+        // solo una vez por cada "mirada fija" (no repetir en cada frame
+        // mientras se sostiene la mirada, para no recorrer miles de
+        // triángulos 60 veces por segundo sin necesidad).
+        if (!dwellFired) {
+          paintPlane(planeIdx, eraseMode ? null : activeZonaId);
+          dwellFired = true;
+        }
+      } else {
+        paintAt(p, brushRadius, eraseMode ? null : activeZonaId, forceGid);
+      }
       drawReticle(eraseMode ? '#ff8266' : '#5fd4c0');
     } else {
-      var frac = dwellMs / DWELL_MS;
+      var frac = dwellMs / neededMs;
       drawReticle(frac > 0.5 ? '#e0a24a' : '#e7efec');
     }
     reticleTex.needsUpdate = true;
