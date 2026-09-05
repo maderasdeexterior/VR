@@ -54,7 +54,7 @@
   .btn-small { width: auto; padding: 8px 12px; font-size: 12.5px; border-radius: 9px; }
   .btn-danger { background: var(--danger); color: #fff; }
 
-  .status { min-height: 18px; margin: 8px 0 0; font-size: 12.5px; color: var(--text-muted); }
+  .status { min-height: 18px; margin: 8px 0 0; font-size: 12.5px; color: var(--text-muted); white-space: pre-wrap; word-break: break-word; }
   .status.err { color: var(--danger); }
   .status.ok { color: var(--accent); }
 
@@ -199,6 +199,8 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/DRACOLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/libs/meshopt_decoder.js"></script>
 <script>
 (function () {
   "use strict";
@@ -414,7 +416,27 @@
   }
 
   // ================= carga del escaneo =================
-  var loadedOnce = false;
+  // Muchos escaneos LiDAR (Polycam incluido) exportan el .glb con la malla
+  // comprimida (Draco o meshopt) para que el archivo pese menos — sin estos
+  // decodificadores configurados, THREE.GLTFLoader no puede leer esa malla
+  // aunque el archivo sea válido. Se configuran una sola vez.
+  var dracoLoader = null;
+  if (window.THREE && THREE.DRACOLoader) {
+    dracoLoader = new THREE.DRACOLoader();
+    dracoLoader.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/libs/draco/');
+  }
+
+  function describeLoadError(err) {
+    if (!err) return 'error desconocido (sin detalles)';
+    var parts = [];
+    if (err.message) parts.push(err.message);
+    if (err.name && err.name !== 'Error') parts.push('(' + err.name + ')');
+    if (!parts.length) {
+      try { parts.push(JSON.stringify(err)); } catch (e) { parts.push(String(err)); }
+    }
+    return parts.join(' ');
+  }
+
   fileInput.addEventListener('change', function () {
     var file = fileInput.files && fileInput.files[0];
     if (!file) return;
@@ -422,13 +444,21 @@
     loadStatus.className = 'status';
     var url = URL.createObjectURL(file);
     var loader = new THREE.GLTFLoader();
+    if (dracoLoader) loader.setDRACOLoader(dracoLoader);
+    if (window.MeshoptDecoder) loader.setMeshoptDecoder(MeshoptDecoder);
     loader.load(url, function (gltf) {
-      onModelLoaded(gltf.scene);
-      loadStatus.textContent = 'Escaneo cargado: ' + file.name + '.';
-      loadStatus.className = 'status ok';
-      btnOpenTool.disabled = false;
+      try {
+        onModelLoaded(gltf.scene);
+        loadStatus.textContent = 'Escaneo cargado: ' + file.name + '.';
+        loadStatus.className = 'status ok';
+        btnOpenTool.disabled = false;
+      } catch (err) {
+        loadStatus.textContent = 'El archivo se leyó pero no se pudo preparar la escena — ' + describeLoadError(err) + (err && err.stack ? ('\n' + err.stack.split('\n').slice(0, 3).join('\n')) : '');
+        loadStatus.className = 'status err';
+        btnOpenTool.disabled = true;
+      }
     }, undefined, function (err) {
-      loadStatus.textContent = 'No se pudo leer el archivo — ¿seguro que es un .glb exportado de Polycam? (' + (err && err.message ? err.message : 'error desconocido') + ')';
+      loadStatus.textContent = 'No se pudo leer el archivo — ¿seguro que es un .glb exportado de Polycam? ' + describeLoadError(err);
       loadStatus.className = 'status err';
     });
   });
