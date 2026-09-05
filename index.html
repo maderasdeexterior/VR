@@ -2,7 +2,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Puente VR</title>
+<title>Escáner + Cotizador</title>
 <style>
   :root {
     --bg: #f4f6f5;
@@ -18,590 +18,309 @@
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
-      --bg: #0b0f0e;
-      --surface: #141a19;
-      --surface-2: #1a2120;
-      --border: #263230;
-      --text: #e7efec;
-      --text-muted: #90a19c;
-      --accent: #5fd4c0;
-      --accent-ink: #06211c;
-      --danger: #ff8266;
-      --mono-track: #263230;
+      --bg: #0b0f0e; --surface: #141a19; --surface-2: #1a2120; --border: #263230;
+      --text: #e7efec; --text-muted: #90a19c; --accent: #5fd4c0; --accent-ink: #06211c;
+      --danger: #ff8266; --mono-track: #263230;
     }
   }
   :root[data-theme="dark"] {
-    --bg: #0b0f0e;
-    --surface: #141a19;
-    --surface-2: #1a2120;
-    --border: #263230;
-    --text: #e7efec;
-    --text-muted: #90a19c;
-    --accent: #5fd4c0;
-    --accent-ink: #06211c;
-    --danger: #ff8266;
-    --mono-track: #263230;
+    --bg: #0b0f0e; --surface: #141a19; --surface-2: #1a2120; --border: #263230;
+    --text: #e7efec; --text-muted: #90a19c; --accent: #5fd4c0; --accent-ink: #06211c;
+    --danger: #ff8266; --mono-track: #263230;
   }
 
   * { box-sizing: border-box; }
   html, body { height: 100%; overscroll-behavior: none; }
   body {
-    margin: 0;
-    background: var(--bg);
-    color: var(--text);
+    margin: 0; background: var(--bg); color: var(--text);
     font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     -webkit-tap-highlight-color: transparent;
   }
   .mono { font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; }
 
-  .setup {
-    min-height: 100dvh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 28px 18px;
-  }
-  .card {
-    width: 100%;
-    max-width: 420px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 18px;
-    padding: 26px 24px 24px;
-  }
-  .eyebrow {
-    margin: 0 0 6px;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--accent);
-  }
-  h1 {
-    margin: 0 0 8px;
-    font-size: 28px;
-    font-weight: 700;
-    letter-spacing: -0.01em;
-    text-wrap: balance;
-  }
-  .sub {
-    margin: 0 0 20px;
-    font-size: 14px;
-    line-height: 1.5;
-    color: var(--text-muted);
-    text-wrap: balance;
-  }
+  .setup { min-height: 100dvh; display: flex; align-items: center; justify-content: center; padding: 28px 18px; }
+  .card { width: 100%; max-width: 440px; background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 26px 24px 24px; }
+  .eyebrow { margin: 0 0 6px; font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); }
+  h1 { margin: 0 0 8px; font-size: 26px; font-weight: 700; letter-spacing: -0.01em; text-wrap: balance; }
+  .sub { margin: 0 0 20px; font-size: 14px; line-height: 1.5; color: var(--text-muted); text-wrap: balance; }
 
-  .sensor-row {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
-    margin-bottom: 16px;
-  }
-  .sensor {
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 10px 6px;
-    text-align: center;
-  }
-  .sensor-label {
-    display: block;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
-    color: var(--text-muted);
-    margin-bottom: 4px;
-  }
-  .sensor-val {
-    display: block;
-    font-family: 'JetBrains Mono', monospace;
-    font-variant-numeric: tabular-nums;
-    font-size: 15px;
-  }
-
-  .btn {
-    width: 100%;
-    border: none;
-    border-radius: 12px;
-    padding: 13px 16px;
-    font-size: 14.5px;
-    font-weight: 600;
-    font-family: inherit;
-    cursor: pointer;
-    transition: filter 0.15s ease, transform 0.05s ease;
-  }
+  .btn { width: 100%; border: none; border-radius: 12px; padding: 13px 16px; font-size: 14.5px; font-weight: 600; font-family: inherit; cursor: pointer; transition: filter 0.15s ease, transform 0.05s ease; }
   .btn:active { transform: scale(0.99); }
-  .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  .btn-ghost {
-    background: var(--surface-2);
-    color: var(--text);
-    border: 1px solid var(--border);
-  }
+  .btn-ghost { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); }
   .btn-ghost:hover { filter: brightness(0.97); }
-  .btn-primary {
-    background: var(--accent);
-    color: var(--accent-ink);
-    margin-top: 18px;
-  }
-  .btn-primary:disabled {
-    opacity: 0.45;
-    cursor: not-allowed;
-  }
+  .btn-primary { background: var(--accent); color: var(--accent-ink); margin-top: 14px; }
+  .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
   .btn-primary:not(:disabled):hover { filter: brightness(1.06); }
+  .btn-small { width: auto; padding: 8px 12px; font-size: 12.5px; border-radius: 9px; }
+  .btn-danger { background: var(--danger); color: #fff; }
 
-  .status {
-    min-height: 18px;
-    margin: 8px 0 0;
-    font-size: 12.5px;
-    color: var(--text-muted);
-  }
+  .status { min-height: 18px; margin: 8px 0 0; font-size: 12.5px; color: var(--text-muted); }
   .status.err { color: var(--danger); }
   .status.ok { color: var(--accent); }
 
-  .controls {
-    margin-top: 18px;
-    padding-top: 16px;
-    border-top: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
+  input[type="file"] { display: block; width: 100%; font-size: 13px; color: var(--text-muted); }
+  input[type="range"] { -webkit-appearance: none; width: 100%; height: 4px; border-radius: 2px; background: var(--mono-track); outline: none; }
+  input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 17px; height: 17px; border-radius: 50%; background: var(--accent); border: 2px solid var(--surface); cursor: pointer; }
+  input[type="range"]::-moz-range-thumb { width: 17px; height: 17px; border-radius: 50%; background: var(--accent); border: 2px solid var(--surface); cursor: pointer; }
+  input[type="text"], select {
+    width: 100%; padding: 9px 10px; border-radius: 9px; border: 1px solid var(--border);
+    background: var(--surface-2); color: var(--text); font-size: 13.5px; font-family: inherit;
   }
-  .controls label {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    font-size: 12.5px;
-    color: var(--text-muted);
-  }
-  .controls label .mono { color: var(--text); font-size: 12.5px; float: right; }
-  .row-head { display: flex; justify-content: space-between; }
-  input[type="range"] {
-    -webkit-appearance: none;
-    width: 100%;
-    height: 4px;
-    border-radius: 2px;
-    background: var(--mono-track);
-    outline: none;
-  }
-  input[type="range"]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 17px; height: 17px;
-    border-radius: 50%;
-    background: var(--accent);
-    border: 2px solid var(--surface);
-    cursor: pointer;
-  }
-  input[type="range"]::-moz-range-thumb {
-    width: 17px; height: 17px;
-    border-radius: 50%;
-    background: var(--accent);
-    border: 2px solid var(--surface);
-    cursor: pointer;
-  }
+  label.field { display: block; font-size: 11.5px; color: var(--text-muted); margin: 8px 0 3px; }
+  .row-head { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--text-muted); }
+  .row-head .mono { color: var(--text); }
 
-  .hint {
-    margin: 16px 0 0;
-    font-size: 12px;
-    line-height: 1.5;
-    color: var(--text-muted);
-  }
-  .diag-log {
-    margin: 10px 0 0;
-    padding: 12px;
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    font-size: 11px;
-    line-height: 1.6;
-    white-space: pre-wrap;
-    word-break: break-word;
-    max-height: 260px;
-    overflow-y: auto;
-  }
-
-  .vr-root {
-    position: fixed; inset: 0;
-    background: #000;
-  }
-  .vr-root canvas { display: block; width: 100%; height: 100%; }
-  .vr-hud {
-    position: fixed;
-    top: env(safe-area-inset-top, 10px);
-    right: env(safe-area-inset-right, 10px);
-    display: flex;
-    gap: 8px;
-    z-index: 5;
-  }
-  .icon-btn {
-    width: 40px; height: 40px;
-    border-radius: 50%;
-    border: 1px solid rgba(255,255,255,0.25);
-    background: rgba(0,0,0,0.45);
-    color: #fff;
-    font-size: 16px;
-    display: flex; align-items: center; justify-content: center;
-    cursor: pointer;
-  }
+  .hint { margin: 14px 0 0; font-size: 12px; line-height: 1.5; color: var(--text-muted); }
   [hidden] { display: none !important; }
+
+  /* ---- herramienta ---- */
+  #tool { position: fixed; inset: 0; background: #0c1210; }
+  #canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+
+  .sheet {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 6;
+    background: var(--surface); border-top: 1px solid var(--border);
+    border-radius: 16px 16px 0 0; padding: 12px 14px calc(14px + env(safe-area-inset-bottom, 0px));
+    max-height: 62dvh; overflow-y: auto;
+  }
+  .sheet-handle { width: 36px; height: 4px; border-radius: 2px; background: var(--border); margin: 0 auto 10px; }
+  .sheet-tabs { display: flex; gap: 8px; margin-bottom: 10px; }
+  .zona-item {
+    display: flex; align-items: center; gap: 8px; padding: 8px 8px; border-radius: 10px;
+    border: 1px solid var(--border); margin-bottom: 6px; background: var(--surface-2);
+  }
+  .zona-item.active { outline: 2px solid var(--accent); }
+  .swatch { width: 16px; height: 16px; border-radius: 50%; flex: none; border: 1px solid rgba(0,0,0,0.15); }
+  .zona-name { font-weight: 600; font-size: 13px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .zona-meta { font-size: 11px; color: var(--text-muted); }
+  .zona-area { font-family: 'JetBrains Mono', monospace; font-size: 12.5px; margin-left: 4px; }
+  .icon-x { border: none; background: none; color: var(--text-muted); font-size: 15px; cursor: pointer; padding: 2px 4px; }
+
+  .top-hud {
+    position: fixed; top: env(safe-area-inset-top, 10px); left: 10px; right: 10px; z-index: 5;
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; pointer-events: none;
+  }
+  .pill {
+    background: rgba(0,0,0,0.55); color: #fff; border-radius: 10px; padding: 7px 11px;
+    font-size: 12px; line-height: 1.4; pointer-events: auto; max-width: 62%;
+  }
+  .pill b { display: block; font-size: 13.5px; }
+  .icon-btn {
+    width: 40px; height: 40px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.25);
+    background: rgba(0,0,0,0.55); color: #fff; font-size: 16px;
+    display: flex; align-items: center; justify-content: center; cursor: pointer; pointer-events: auto;
+  }
+  .hud-btns { display: flex; gap: 8px; pointer-events: auto; }
+
+  .fab-row { position: fixed; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); z-index: 7; display: flex; flex-direction: column; gap: 8px; }
+  .fab {
+    width: 52px; height: 52px; border-radius: 50%; border: none; background: var(--accent); color: var(--accent-ink);
+    font-size: 20px; box-shadow: 0 4px 14px rgba(0,0,0,0.25); cursor: pointer;
+  }
+  .fab.ghost { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+  .fab.on { background: var(--danger); color: #fff; }
 </style>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700&family=JetBrains+Mono:wght@400;500&display=swap">
 
 <div id="setup" class="setup">
   <div class="card">
-    <p class="eyebrow">3DOF &middot; visor cerrado, sin passthrough</p>
-    <h1>Puente VR</h1>
-    <p class="sub">Usa el giroscopio del teléfono con la tapa de cámara puesta. Calibra la distorsión de tus lentes aquí antes de meter el teléfono al visor.</p>
+    <p class="eyebrow">Escaneo 3D &middot; selección de áreas &middot; cotización</p>
+    <h1>Escáner + Cotizador</h1>
+    <p class="sub">Carga el escaneo de un espacio (exportado como .glb desde Polycam), marca las zonas por material y genera el resumen de áreas para la cotización.</p>
 
-    <div class="sensor-row">
-      <div class="sensor"><span class="sensor-label">α acimut</span><span id="valAlpha" class="sensor-val mono">—</span></div>
-      <div class="sensor"><span class="sensor-label">β cabeceo</span><span id="valBeta" class="sensor-val mono">—</span></div>
-      <div class="sensor"><span class="sensor-label">γ alabeo</span><span id="valGamma" class="sensor-val mono">—</span></div>
-    </div>
+    <label class="field">Archivo del escaneo (.glb)</label>
+    <input type="file" id="fileInput" accept=".glb,.gltf,model/gltf-binary">
+    <p id="loadStatus" class="status">Aún no se ha cargado ningún escaneo.</p>
 
-    <button id="btnSensor" class="btn btn-ghost">Activar sensor de movimiento</button>
-    <p id="sensorStatus" class="status">Toca el botón — iOS pedirá permiso de movimiento.</p>
-
-    <button id="btnDiag" class="btn btn-ghost" style="margin-top:6px;">Diagnóstico técnico</button>
-    <pre id="diagLog" class="mono diag-log" hidden></pre>
-
-    <div class="controls">
-      <label>
-        <span class="row-head"><span>Tu separación pupilar (profundidad 3D)</span><span id="ipdVal" class="mono">63.0 mm</span></span>
-        <input type="range" id="ipd" min="50" max="72" value="63" step="0.5">
-      </label>
-      <label>
-        <span class="row-head"><span>Ajuste de fusión (junta / separa las 2 imágenes)</span><span id="eyeShiftVal" class="mono">0%</span></span>
-        <input type="range" id="eyeShift" min="-10" max="10" value="0" step="0.5">
-      </label>
-      <label>
-        <span class="row-head"><span>Distorsión de barril — k1</span><span id="k1Val" class="mono">0.22</span></span>
-        <input type="range" id="k1" min="0" max="0.6" value="0.22" step="0.01">
-      </label>
-      <label>
-        <span class="row-head"><span>Distorsión de barril — k2</span><span id="k2Val" class="mono">0.24</span></span>
-        <input type="range" id="k2" min="0" max="0.6" value="0.24" step="0.01">
-      </label>
-    </div>
-
-    <button id="btnEnter" class="btn btn-primary" disabled>Entrar en modo visor</button>
-    <p class="hint">Dentro del visor, las líneas de la rejilla deben verse rectas — si se ven curvas hacia adentro, sube k1/k2; si se ven curvas hacia afuera, bájalos. Si las dos imágenes no funden en una sola: "Tu separación pupilar" es solo para la profundidad 3D, no corrige esto — usa "Ajuste de fusión": positivo las acerca, negativo las aleja. Muévelo poco a poco hasta que ambos ojos vean una sola imagen fundida, y entonces regresa la separación pupilar a un valor cercano a tu distancia real entre ojos (no hace falta que coincida con la del visor). Gira el teléfono a horizontal antes de insertarlo.</p>
+    <button id="btnOpenTool" class="btn btn-primary" disabled>Abrir escáner</button>
+    <p class="hint">Si tu escaneo se ve fuera de escala o desalineado, no pasa nada — puedes seguir marcando zonas, y luego ajustamos el factor de escala antes de cotizar si hace falta.</p>
   </div>
 </div>
 
-<div id="vrRoot" class="vr-root" hidden>
+<div id="tool" hidden>
   <canvas id="canvas"></canvas>
-  <div class="vr-hud">
-    <button id="btnRecenter" class="icon-btn" aria-label="Centrar vista" title="Centrar vista">⟲</button>
-    <button id="btnExit" class="icon-btn" aria-label="Salir" title="Salir">✕</button>
+
+  <div class="top-hud">
+    <div id="pillZona" class="pill"><b id="pillZonaName">Sin zona activa</b><span id="pillZonaArea">—</span></div>
+    <div class="hud-btns">
+      <button id="btnRecenter" class="icon-btn" title="Centrar vista (solo VR)" hidden>⟲</button>
+      <button id="btnExitVR" class="icon-btn" title="Salir de VR" hidden>✕</button>
+    </div>
+  </div>
+
+  <div class="fab-row">
+    <button id="fabErase" class="fab ghost" title="Goma (borrar)">⌫</button>
+    <button id="fabVR" class="fab ghost" title="Entrar en modo VR">🥽</button>
+    <button id="fabSheet" class="fab" title="Zonas y materiales">☰</button>
+  </div>
+
+  <div id="sheet" class="sheet">
+    <div class="sheet-handle" id="sheetHandle" style="cursor:pointer;"></div>
+
+    <div id="sensorGate" class="status" style="margin-bottom:8px;"></div>
+    <button id="btnSensorGate" class="btn btn-ghost" style="margin-bottom:10px;" hidden>Activar sensor de movimiento (necesario para VR)</button>
+
+    <label class="field">Radio de pincel</label>
+    <div class="row-head"><span>Tamaño de zona a pintar por toque</span><span id="brushVal" class="mono">0.15 m</span></div>
+    <input type="range" id="brush" min="0.05" max="0.6" step="0.01" value="0.15">
+
+    <div id="zonaList" style="margin-top:12px;"></div>
+
+    <button id="btnNuevaZona" class="btn btn-ghost" style="margin-top:6px;">+ Nueva zona</button>
+
+    <div id="zonaForm" hidden style="margin-top:10px; padding:10px; border:1px solid var(--border); border-radius:10px; background:var(--surface-2);">
+      <label class="field">Ubicación (para identificarla, ej. "Muro norte sala")</label>
+      <input type="text" id="zTag" placeholder="Muro norte sala">
+      <label class="field">Código de catálogo (para el precio — ej. UH67, DECK UH02, SPC-02)</label>
+      <input type="text" id="zCodigo" placeholder="UH67" list="catalogoCodigos">
+      <datalist id="catalogoCodigos">
+        <option value="DECK UH02"><option value="UH67"><option value="SPC-02">
+      </datalist>
+      <label class="field">Tipo</label>
+      <select id="zTipo">
+        <option value="deck_wpc">Piso WPC sobre bastidor (deck)</option>
+        <option value="revestimiento_wpc">Revestimiento WPC (muro/plafón)</option>
+        <option value="spc">Piso SPC</option>
+      </select>
+      <label class="field">Marca</label>
+      <input type="text" id="zMarca" value="NewTechWood">
+      <p class="hint" style="margin:8px 0 0;">Si el código todavía no existe en el catálogo de precios, créala igual — solo avísame antes de generar la cotización para agregar su precio.</p>
+      <div style="display:flex; gap:8px; margin-top:10px;">
+        <button id="btnZonaCrear" class="btn btn-primary" style="margin-top:0;">Crear y activar</button>
+        <button id="btnZonaCancelar" class="btn btn-ghost">Cancelar</button>
+      </div>
+    </div>
+
+    <button id="btnExport" class="btn btn-primary">Descargar resumen (JSON) para cotizar</button>
+    <p class="hint" id="scaleHint">Factor de escala: <span id="scaleVal" class="mono">1.00</span> — si conoces una medida real del espacio, usa "Calibrar escala" para corregirlo.</p>
+    <button id="btnCalibrar" class="btn btn-ghost">Calibrar escala con una medida conocida</button>
   </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script>
 (function () {
   "use strict";
 
-  // ---------- estado / elementos ----------
+  // ================= elementos =================
   var setupEl = document.getElementById('setup');
-  var vrRoot = document.getElementById('vrRoot');
+  var fileInput = document.getElementById('fileInput');
+  var loadStatus = document.getElementById('loadStatus');
+  var btnOpenTool = document.getElementById('btnOpenTool');
+
+  var toolEl = document.getElementById('tool');
   var canvas = document.getElementById('canvas');
-  var btnSensor = document.getElementById('btnSensor');
-  var sensorStatus = document.getElementById('sensorStatus');
-  var btnEnter = document.getElementById('btnEnter');
-  var btnExit = document.getElementById('btnExit');
+  var sheet = document.getElementById('sheet');
+  var fabSheet = document.getElementById('fabSheet');
+  var fabErase = document.getElementById('fabErase');
+  var fabVR = document.getElementById('fabVR');
   var btnRecenter = document.getElementById('btnRecenter');
-  var valAlpha = document.getElementById('valAlpha');
-  var valBeta = document.getElementById('valBeta');
-  var valGamma = document.getElementById('valGamma');
-  var ipdInput = document.getElementById('ipd');
-  var eyeShiftInput = document.getElementById('eyeShift');
-  var k1Input = document.getElementById('k1');
-  var k2Input = document.getElementById('k2');
-  var ipdVal = document.getElementById('ipdVal');
-  var eyeShiftVal = document.getElementById('eyeShiftVal');
-  var k1Val = document.getElementById('k1Val');
-  var k2Val = document.getElementById('k2Val');
-  var btnDiag = document.getElementById('btnDiag');
-  var diagLog = document.getElementById('diagLog');
+  var btnExitVR = document.getElementById('btnExitVR');
+  var pillZonaName = document.getElementById('pillZonaName');
+  var pillZonaArea = document.getElementById('pillZonaArea');
 
-  // ---------- diagnóstico técnico ----------
-  function diagLine(s) {
-    diagLog.textContent += s + '\n';
-    diagLog.scrollTop = diagLog.scrollHeight;
+  var sensorGate = document.getElementById('sensorGate');
+  var btnSensorGate = document.getElementById('btnSensorGate');
+  var brushInput = document.getElementById('brush');
+  var brushVal = document.getElementById('brushVal');
+  var zonaList = document.getElementById('zonaList');
+  var btnNuevaZona = document.getElementById('btnNuevaZona');
+  var zonaForm = document.getElementById('zonaForm');
+  var zTag = document.getElementById('zTag');
+  var zCodigo = document.getElementById('zCodigo');
+  var zTipo = document.getElementById('zTipo');
+  var zMarca = document.getElementById('zMarca');
+  var btnZonaCrear = document.getElementById('btnZonaCrear');
+  var btnZonaCancelar = document.getElementById('btnZonaCancelar');
+  var btnExport = document.getElementById('btnExport');
+  var btnCalibrar = document.getElementById('btnCalibrar');
+  var scaleVal = document.getElementById('scaleVal');
+
+  // ================= estado =================
+  var PALETTE = [0x5fd4c0, 0xe0a24a, 0xe0644a, 0x8a6fe0, 0x4ab0e0, 0xd7e04a, 0xe06fbf, 0x6fe08a];
+  var zonas = [];           // {id, tag, tipo, marca, colorHex, area}
+  var zonaSeq = 0;
+  var activeZonaId = null;
+  var eraseMode = false;
+  var scaleFactor = 1.0;
+  var brushRadius = 0.15;
+
+  var triMeta = [];         // {meshIdx, tri, area, cx, cy, cz}
+  var triOwner = new Map(); // globalId -> zonaId
+  var grid = new Map();     // 'x,y,z' -> [globalId,...]
+  var CELL = 0.25;
+  var paintMeshes = [];     // {mesh, colorAttr}
+
+  function cellKey(x, y, z) {
+    return Math.round(x / CELL) + ',' + Math.round(y / CELL) + ',' + Math.round(z / CELL);
   }
 
-  var diagOrientCount = 0, diagMotionCount = 0;
-  function diagOrientListener(e) {
-    diagOrientCount++;
-    if (diagOrientCount === 1) {
-      diagLine('[deviceorientation] primer evento recibido. alpha=' + e.alpha + ' beta=' + e.beta + ' gamma=' + e.gamma + ' absolute=' + e.absolute);
-    }
-  }
-  function diagMotionListener(e) {
-    diagMotionCount++;
-    if (diagMotionCount === 1) {
-      var rr = e.rotationRate || {};
-      diagLine('[devicemotion] primer evento recibido. rotationRate alpha=' + rr.alpha + ' beta=' + rr.beta + ' gamma=' + rr.gamma);
-    }
-  }
-
-  btnDiag.addEventListener('click', function () {
-    diagLog.hidden = false;
-    diagLog.textContent = '';
-    diagLine('--- Diagnóstico técnico — ' + new Date().toLocaleTimeString() + ' ---');
-    diagLine('URL: ' + location.href);
-    diagLine('origin: ' + location.origin + '  protocol: ' + location.protocol);
-    diagLine('isSecureContext: ' + window.isSecureContext);
-    diagLine('userAgent: ' + navigator.userAgent);
-    diagLine('en iframe (top !== self): ' + (window.top !== window.self));
-    diagLine('');
-
-    diagLine('typeof DeviceOrientationEvent: ' + (typeof DeviceOrientationEvent));
-    if (typeof DeviceOrientationEvent !== 'undefined') {
-      diagLine('typeof DeviceOrientationEvent.requestPermission: ' + (typeof DeviceOrientationEvent.requestPermission));
-    }
-    diagLine('typeof DeviceMotionEvent: ' + (typeof DeviceMotionEvent));
-    if (typeof DeviceMotionEvent !== 'undefined') {
-      diagLine('typeof DeviceMotionEvent.requestPermission: ' + (typeof DeviceMotionEvent.requestPermission));
-    }
-    diagLine("'ondeviceorientation' in window: " + ('ondeviceorientation' in window));
-    diagLine("'ondevicemotion' in window: " + ('ondevicemotion' in window));
-    diagLine('');
-
-    // Intento real de permiso de orientación
-    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-      diagLine('Llamando DeviceOrientationEvent.requestPermission()...');
-      DeviceOrientationEvent.requestPermission().then(function (state) {
-        diagLine('  -> resuelto con valor: "' + state + '"');
-        if (state === 'granted') {
-          window.addEventListener('deviceorientation', diagOrientListener);
-          diagLine('  -> listener de deviceorientation agregado, esperando eventos...');
-        }
-      }).catch(function (err) {
-        diagLine('  -> RECHAZADO (excepción): ' + (err && err.name) + ': ' + (err && err.message));
-      });
-    } else if (typeof DeviceOrientationEvent !== 'undefined') {
-      diagLine('No existe requestPermission — este navegador no lo exige. Agregando listener directo...');
-      window.addEventListener('deviceorientation', diagOrientListener);
-    } else {
-      diagLine('DeviceOrientationEvent NO existe en este navegador.');
-    }
-
-    // Intento real de permiso de movimiento (API separada de la de orientación)
-    if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
-      diagLine('Llamando DeviceMotionEvent.requestPermission()...');
-      DeviceMotionEvent.requestPermission().then(function (state) {
-        diagLine('  -> resuelto con valor: "' + state + '"');
-        if (state === 'granted') {
-          window.addEventListener('devicemotion', diagMotionListener);
-          diagLine('  -> listener de devicemotion agregado, esperando eventos...');
-        }
-      }).catch(function (err) {
-        diagLine('  -> RECHAZADO (excepción): ' + (err && err.name) + ': ' + (err && err.message));
-      });
-    } else if (typeof DeviceMotionEvent !== 'undefined') {
-      window.addEventListener('devicemotion', diagMotionListener);
-    }
-
-    diagLine('');
-    diagLine('(si dice "granted" pero nunca aparece "primer evento recibido" tras mover el teléfono unos segundos, el permiso está bien pero el sistema no está entregando eventos — otra causa distinta)');
-  });
-
-  var params = { ipdMm: 63, eyeShift: 0, k1: 0.22, k2: 0.24 };
-  var sensorReady = false;
-  var latest = { alpha: 0, beta: 0, gamma: 0 };
-  var yawOffsetDeg = 0;
-
-  ipdInput.addEventListener('input', function () {
-    params.ipdMm = parseFloat(ipdInput.value);
-    ipdVal.textContent = params.ipdMm.toFixed(1) + ' mm';
-    updateEyeOffsets();
-  });
-  eyeShiftInput.addEventListener('input', function () {
-    var pct = parseFloat(eyeShiftInput.value);
-    params.eyeShift = pct / 100.0;
-    eyeShiftVal.textContent = (pct > 0 ? '+' : '') + pct.toFixed(1) + '%';
-    if (distortMat) distortMat.uniforms.eyeShift.value = params.eyeShift;
-  });
-  k1Input.addEventListener('input', function () {
-    params.k1 = parseFloat(k1Input.value);
-    k1Val.textContent = params.k1.toFixed(2);
-    if (distortMat) distortMat.uniforms.k1.value = params.k1;
-  });
-  k2Input.addEventListener('input', function () {
-    params.k2 = parseFloat(k2Input.value);
-    k2Val.textContent = params.k2.toFixed(2);
-    if (distortMat) distortMat.uniforms.k2.value = params.k2;
-  });
-
-  // ---------- permiso / lectura de sensor ----------
-  function onDeviceOrientation(e) {
-    if (e.alpha === null) return;
-    latest.alpha = e.alpha; latest.beta = e.beta; latest.gamma = e.gamma;
-    valAlpha.textContent = e.alpha.toFixed(1) + '°';
-    valBeta.textContent = e.beta.toFixed(1) + '°';
-    valGamma.textContent = e.gamma.toFixed(1) + '°';
-    if (!sensorReady) {
-      sensorReady = true;
-      sensorStatus.textContent = 'Sensor activo — datos en vivo arriba.';
-      sensorStatus.className = 'status ok';
-      btnEnter.disabled = false;
-    }
-  }
-
-  btnSensor.addEventListener('click', function () {
-    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-      DeviceOrientationEvent.requestPermission().then(function (state) {
-        if (state === 'granted') {
-          window.addEventListener('deviceorientation', onDeviceOrientation);
-          sensorStatus.textContent = 'Permiso concedido. Mueve el teléfono para confirmar.';
-          sensorStatus.className = 'status';
-        } else {
-          sensorStatus.textContent = 'Permiso denegado. Sin esto, la vista no puede seguir tu cabeza.';
-          sensorStatus.className = 'status err';
-        }
-      }).catch(function () {
-        sensorStatus.textContent = 'Este navegador no expuso el sensor. Prueba en Safari, iOS.';
-        sensorStatus.className = 'status err';
-      });
-    } else if (window.DeviceOrientationEvent) {
-      window.addEventListener('deviceorientation', onDeviceOrientation);
-      sensorStatus.textContent = 'Sensor activado. Mueve el teléfono para confirmar.';
-      sensorStatus.className = 'status';
-    } else {
-      sensorStatus.textContent = 'Este dispositivo no reporta orientación — el modo visor no podrá seguir tu cabeza.';
-      sensorStatus.className = 'status err';
-    }
-  });
-
-  // ---------- three.js ----------
-  var renderer, scene, rig, cameraL, cameraR, rt;
-  var distortScene, distortCamera, distortMat;
+  // ================= three.js: escena compartida =================
+  var renderer, scene, scanRoot;
+  var flatCamera;
+  var rig, cameraL, cameraR, rt, distortScene, distortCamera, distortMat;
+  var reticle, reticleMat;
   var w = 0, h = 0;
+  var mode = 'flat'; // 'flat' | 'vr'
+  var rafId = null;
 
-  function makeGridTexture(bg, fg) {
-    var c = document.createElement('canvas');
-    c.width = 512; c.height = 512;
-    var ctx = c.getContext('2d');
-    ctx.fillStyle = bg; ctx.fillRect(0, 0, 512, 512);
-    ctx.strokeStyle = 'rgba(255,255,255,0.4)';
-    ctx.lineWidth = 3;
-    for (var i = 0; i <= 512; i += 64) {
-      ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 512); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(512, i); ctx.stroke();
-    }
-    ctx.strokeStyle = fg; ctx.lineWidth = 6; ctx.strokeRect(3, 3, 506, 506);
-    var tex = new THREE.CanvasTexture(c);
-    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-    return tex;
+  // Un solo "rig de mirada" para ambos modos: en modo pantalla lo orienta el
+  // dedo (arrastrar), en modo VR lo orienta el giroscopio. Así el mismo
+  // sistema de puntería + pintado por "mirada fija" sirve para los dos,
+  // y la posición (dentro del espacio escaneado) es la misma en ambos.
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0c1210);
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x333333, 1.1));
+  var dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
+  dirLight.position.set(2, 4, 3);
+  scene.add(dirLight);
+
+  scanRoot = new THREE.Object3D();
+  scene.add(scanRoot);
+
+  rig = new THREE.Object3D();
+  rig.position.set(0, 1.6, 0);
+  scene.add(rig);
+  flatCamera = new THREE.PerspectiveCamera(75, 1, 0.02, 100);
+  cameraL = new THREE.PerspectiveCamera(90, 1, 0.05, 50);
+  cameraR = new THREE.PerspectiveCamera(90, 1, 0.05, 50);
+  rig.add(flatCamera, cameraL, cameraR);
+
+  var reticleCanvas = document.createElement('canvas');
+  reticleCanvas.width = 64; reticleCanvas.height = 64;
+  var rctx = reticleCanvas.getContext('2d');
+  function drawReticle(color) {
+    rctx.clearRect(0, 0, 64, 64);
+    rctx.strokeStyle = color; rctx.lineWidth = 5;
+    rctx.beginPath(); rctx.arc(32, 32, 22, 0, Math.PI * 2); rctx.stroke();
+    rctx.beginPath(); rctx.arc(32, 32, 4, 0, Math.PI * 2); rctx.fillStyle = color; rctx.fill();
   }
-
-  function makeLabelTexture(text, bg, fg) {
-    var c = document.createElement('canvas');
-    c.width = 512; c.height = 512;
-    var ctx = c.getContext('2d');
-    ctx.fillStyle = bg; ctx.fillRect(0, 0, 512, 512);
-    ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 3;
-    for (var i = 0; i <= 512; i += 64) {
-      ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 512); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(512, i); ctx.stroke();
-    }
-    ctx.fillStyle = fg;
-    ctx.font = 'bold 72px monospace';
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(text, 256, 256);
-    return new THREE.CanvasTexture(c);
-  }
-
-  function buildScene() {
-    scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0c1210);
-
-    var room = 5;
-    var half = room / 2;
-
-    var floorTex = makeGridTexture('#12312a', '#5fd4c0');
-    var floor = new THREE.Mesh(new THREE.PlaneGeometry(room, room),
-      new THREE.MeshBasicMaterial({ map: floorTex }));
-    floor.rotation.x = -Math.PI / 2;
-    floor.position.y = 0;
-    scene.add(floor);
-
-    var ceilTex = makeLabelTexture('ARRIBA', '#1a2620', '#e7efec');
-    var ceil = new THREE.Mesh(new THREE.PlaneGeometry(room, room),
-      new THREE.MeshBasicMaterial({ map: ceilTex }));
-    ceil.rotation.x = Math.PI / 2;
-    ceil.position.y = 3.2;
-    scene.add(ceil);
-
-    var wallDefs = [
-      { pos: [0, 1.6, -half], rot: [0, 0, 0], color: '#1f3a33', label: 'PARED N' },
-      { pos: [0, 1.6, half], rot: [0, Math.PI, 0], color: '#33231f', label: 'PARED S' },
-      { pos: [-half, 1.6, 0], rot: [0, Math.PI / 2, 0], color: '#1f2a3a', label: 'PARED O' },
-      { pos: [half, 1.6, 0], rot: [0, -Math.PI / 2, 0], color: '#3a1f34', label: 'PARED E' }
-    ];
-    wallDefs.forEach(function (wd) {
-      var tex = makeLabelTexture(wd.label, wd.color, '#e7efec');
-      var wall = new THREE.Mesh(new THREE.PlaneGeometry(room, 3.2), new THREE.MeshBasicMaterial({ map: tex }));
-      wall.position.set(wd.pos[0], wd.pos[1], wd.pos[2]);
-      wall.rotation.set(wd.rot[0], wd.rot[1], wd.rot[2]);
-      scene.add(wall);
-    });
-
-    var cubeColors = [0x5fd4c0, 0xe0a24a, 0xe0644a, 0x8a6fe0, 0x4ab0e0, 0xd7e04a];
-    var positions = [
-      [-1.4, 1.2, -1.6], [1.5, 0.7, -1.1], [0.3, 2.1, -2.2],
-      [-1.8, 1.6, 1.4], [1.8, 1.0, 1.8], [0, 0.5, -0.9]
-    ];
-    positions.forEach(function (p, i) {
-      var cube = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.35, 0.35),
-        new THREE.MeshBasicMaterial({ color: cubeColors[i % cubeColors.length] }));
-      cube.position.set(p[0], p[1], p[2]);
-      scene.add(cube);
-    });
-
-    rig = new THREE.Object3D();
-    rig.position.set(0, 1.6, 0);
-    scene.add(rig);
-
-    cameraL = new THREE.PerspectiveCamera(90, 1, 0.05, 50);
-    cameraR = new THREE.PerspectiveCamera(90, 1, 0.05, 50);
-    rig.add(cameraL);
-    rig.add(cameraR);
-    updateEyeOffsets();
-  }
+  drawReticle('#e7efec');
+  var reticleTex = new THREE.CanvasTexture(reticleCanvas);
+  reticleMat = new THREE.SpriteMaterial({ map: reticleTex, depthTest: false, transparent: true });
+  reticle = new THREE.Sprite(reticleMat);
+  reticle.scale.set(0.09, 0.09, 0.09);
+  reticle.position.set(0, 0, -2);
+  reticle.renderOrder = 999;
+  rig.add(reticle);
 
   function updateEyeOffsets() {
-    if (!cameraL) return;
-    var half = (params.ipdMm / 1000) / 2;
+    var half = 0.032;
     cameraL.position.set(-half, 0, 0);
     cameraR.position.set(half, 0, 0);
   }
+  updateEyeOffsets();
 
+  // ---- distorsión de barril (misma fórmula validada en Puente VR) ----
   function buildDistortPass() {
     distortScene = new THREE.Scene();
     distortCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
     distortMat = new THREE.ShaderMaterial({
-      uniforms: {
-        tex: { value: null },
-        k1: { value: params.k1 },
-        k2: { value: params.k2 },
-        aspectHalf: { value: 1.0 },
-        eyeShift: { value: params.eyeShift }
-      },
-      vertexShader: [
-        'varying vec2 vUv;',
-        'void main() {',
-        '  vUv = uv;',
-        '  gl_Position = vec4(position.xy, 0.0, 1.0);',
-        '}'
-      ].join('\n'),
+      uniforms: { tex: { value: null }, k1: { value: 0.22 }, k2: { value: 0.24 }, aspectHalf: { value: 1.0 }, eyeShift: { value: 0.0 } },
+      vertexShader: ['varying vec2 vUv;', 'void main() {', '  vUv = uv;', '  gl_Position = vec4(position.xy, 0.0, 1.0);', '}'].join('\n'),
       fragmentShader: [
-        'uniform sampler2D tex;',
-        'uniform float k1;',
-        'uniform float k2;',
-        'uniform float aspectHalf;',
-        'uniform float eyeShift;',
+        'uniform sampler2D tex;', 'uniform float k1;', 'uniform float k2;', 'uniform float aspectHalf;', 'uniform float eyeShift;',
         'varying vec2 vUv;',
         'void main() {',
         '  float eyeCenter = vUv.x < 0.5 ? 0.25 : 0.75;',
@@ -626,12 +345,13 @@
     distortScene.add(quad);
   }
 
-  // Conversión estándar deviceorientation -> quaternion (misma usada por
-  // THREE.DeviceOrientationControls histórico)
   var zee = new THREE.Vector3(0, 0, 1);
   var euler = new THREE.Euler();
   var q0 = new THREE.Quaternion();
   var q1 = new THREE.Quaternion(-Math.sqrt(0.5), 0, 0, Math.sqrt(0.5));
+  var yawOffsetDeg = 0;
+  var latest = { alpha: 0, beta: 0, gamma: 0 };
+  var sensorReady = false;
 
   function setRigQuaternion(alphaDeg, betaDeg, gammaDeg, screenOrientDeg) {
     var alpha = THREE.MathUtils.degToRad(alphaDeg - yawOffsetDeg);
@@ -643,113 +363,494 @@
     rig.quaternion.multiply(q1);
     rig.quaternion.multiply(q0.setFromAxisAngle(zee, -orient));
   }
-
   function getScreenOrientAngle() {
     if (screen.orientation && typeof screen.orientation.angle === 'number') return screen.orientation.angle;
     if (typeof window.orientation === 'number') return window.orientation;
     return 0;
+  }
+  function onDeviceOrientation(e) {
+    if (e.alpha === null) return;
+    latest.alpha = e.alpha; latest.beta = e.beta; latest.gamma = e.gamma;
+    if (!sensorReady) {
+      sensorReady = true;
+      sensorGate.textContent = 'Sensor activo.';
+      sensorGate.className = 'status ok';
+      btnSensorGate.hidden = true;
+      fabVR.disabled = false;
+    }
+  }
+  function requestSensor(onDone) {
+    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+      DeviceOrientationEvent.requestPermission().then(function (state) {
+        if (state === 'granted') {
+          window.addEventListener('deviceorientation', onDeviceOrientation);
+          if (onDone) onDone(true);
+        } else {
+          sensorGate.textContent = 'Permiso denegado — sin esto no se puede usar el modo VR.';
+          sensorGate.className = 'status err';
+          if (onDone) onDone(false);
+        }
+      }).catch(function () {
+        sensorGate.textContent = 'Este navegador no expuso el sensor de movimiento.';
+        sensorGate.className = 'status err';
+        if (onDone) onDone(false);
+      });
+    } else if (window.DeviceOrientationEvent) {
+      window.addEventListener('deviceorientation', onDeviceOrientation);
+      if (onDone) onDone(true);
+    } else {
+      sensorGate.textContent = 'Este dispositivo no reporta orientación.';
+      sensorGate.className = 'status err';
+      if (onDone) onDone(false);
+    }
+  }
+
+  function requestFullscreenBestEffort(el) {
+    var target = el;
+    var fn = target.requestFullscreen || target.webkitRequestFullscreen || target.webkitEnterFullscreen;
+    if (!fn) { target = document.documentElement; fn = target.requestFullscreen || target.webkitRequestFullscreen; }
+    if (!fn) return;
+    try { var p = fn.call(target); if (p && p.catch) p.catch(function () {}); } catch (e) {}
+  }
+
+  // ================= carga del escaneo =================
+  var loadedOnce = false;
+  fileInput.addEventListener('change', function () {
+    var file = fileInput.files && fileInput.files[0];
+    if (!file) return;
+    loadStatus.textContent = 'Cargando "' + file.name + '"...';
+    loadStatus.className = 'status';
+    var url = URL.createObjectURL(file);
+    var loader = new THREE.GLTFLoader();
+    loader.load(url, function (gltf) {
+      onModelLoaded(gltf.scene);
+      loadStatus.textContent = 'Escaneo cargado: ' + file.name + '.';
+      loadStatus.className = 'status ok';
+      btnOpenTool.disabled = false;
+    }, undefined, function (err) {
+      loadStatus.textContent = 'No se pudo leer el archivo — ¿seguro que es un .glb exportado de Polycam? (' + (err && err.message ? err.message : 'error desconocido') + ')';
+      loadStatus.className = 'status err';
+    });
+  });
+
+  function onModelLoaded(root) {
+    // limpiar escaneo anterior
+    while (scanRoot.children.length) scanRoot.remove(scanRoot.children[0]);
+    triMeta = []; triOwner.clear(); grid.clear(); paintMeshes = [];
+    zonas = []; activeZonaId = null; renderZonaList(); updatePillZona();
+
+    root.updateMatrixWorld(true);
+    var meshes = [];
+    root.traverse(function (obj) { if (obj.isMesh) meshes.push(obj); });
+
+    meshes.forEach(function (mesh) {
+      var geom = mesh.geometry;
+      if (geom.index) geom = geom.toNonIndexed();
+      geom = geom.clone();
+      // aplicar la transformación de mundo directamente a las posiciones,
+      // para trabajar siempre en coordenadas de mundo (más simple para pintar/medir)
+      geom.applyMatrix4(mesh.matrixWorld);
+
+      var count = geom.attributes.position.count;
+      var colors = new Float32Array(count * 3);
+      for (var i = 0; i < colors.length; i++) colors[i] = 1.0;
+      geom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+      var mat = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+      var map = mat ? mat.map : null;
+      // side: DoubleSide porque muchas mallas de escaneo (LiDAR/fotogrametría)
+      // no tienen un sentido de "normal" consistente — sin esto, caras que
+      // deberían verse desde dentro del cuarto pueden desaparecer.
+      var newMat = new THREE.MeshBasicMaterial({ map: map || null, vertexColors: true, color: map ? 0xffffff : 0xb9c4bf, side: THREE.DoubleSide });
+      var newMesh = new THREE.Mesh(geom, newMat);
+      scanRoot.add(newMesh);
+
+      var meshIdx = paintMeshes.length;
+      var triGlobalIds = [];
+      paintMeshes.push({ mesh: newMesh, colorAttr: geom.attributes.color, triGlobalIds: triGlobalIds });
+      newMesh.userData.meshIdx = meshIdx;
+
+      var pos = geom.attributes.position;
+      var triCount = pos.count / 3;
+      var a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+      for (var t = 0; t < triCount; t++) {
+        var i0 = t * 3;
+        a.fromBufferAttribute(pos, i0); b.fromBufferAttribute(pos, i0 + 1); c.fromBufferAttribute(pos, i0 + 2);
+        var area = new THREE.Triangle(a, b, c).getArea();
+        var cx = (a.x + b.x + c.x) / 3, cy = (a.y + b.y + c.y) / 3, cz = (a.z + b.z + c.z) / 3;
+        var gid = triMeta.length;
+        triMeta.push({ meshIdx: meshIdx, tri: t, area: area, cx: cx, cy: cy, cz: cz });
+        triGlobalIds[t] = gid;
+        var key = cellKey(cx, cy, cz);
+        var arr = grid.get(key);
+        if (!arr) { arr = []; grid.set(key, arr); }
+        arr.push(gid);
+      }
+    });
+
+    // Un escaneo de interior se recorre desde ADENTRO, no se ve como un
+    // objeto de afuera — colocamos el punto de vista al centro del cuarto,
+    // a una altura de ojos típica sobre el piso (parte inferior del cajón).
+    var box = new THREE.Box3().setFromObject(scanRoot);
+    var center = box.getCenter(new THREE.Vector3());
+    var eyeY = Math.min(box.min.y + 1.6, box.max.y - 0.1);
+    rig.position.set(center.x, eyeY, center.z);
+    flatYaw = 0; flatPitch = 0;
+    applyFlatLook();
+  }
+
+  // ================= pintado por radio =================
+  // forceGid: id global del triángulo exactamente golpeado por el rayo —
+  // se incluye SIEMPRE, sin importar la distancia de su centroide al punto.
+  // Esto importa porque en mallas con triángulos grandes (zonas planas
+  // simplificadas, típico en escaneos LiDAR) el centroide de un triángulo
+  // puede quedar fuera del radio del pincel aunque el rayo lo haya
+  // golpeado justo en una esquina — sin esto, tocar/mirar un triángulo
+  // grande podía no seleccionar nada.
+  function paintAt(point, radius, zonaIdOrErase, forceGid) {
+    var touched = new Set();
+    var reAdd = new Set(); // zonaId set cuyas áreas cambiaron
+
+    function apply(gid) {
+      var m = triMeta[gid];
+      var prevZona = triOwner.get(gid);
+      if (prevZona === zonaIdOrErase) return;
+      if (prevZona !== undefined) reAdd.add(prevZona);
+      if (zonaIdOrErase === null) {
+        triOwner.delete(gid);
+      } else {
+        triOwner.set(gid, zonaIdOrErase);
+        reAdd.add(zonaIdOrErase);
+      }
+      setTriColor(m, zonaIdOrErase);
+      touched.add(m.meshIdx);
+    }
+
+    if (forceGid !== undefined && forceGid !== null) apply(forceGid);
+
+    var minCx = point.x - radius, maxCx = point.x + radius;
+    var minCy = point.y - radius, maxCy = point.y + radius;
+    var minCz = point.z - radius, maxCz = point.z + radius;
+    var gx0 = Math.round(minCx / CELL), gx1 = Math.round(maxCx / CELL);
+    var gy0 = Math.round(minCy / CELL), gy1 = Math.round(maxCy / CELL);
+    var gz0 = Math.round(minCz / CELL), gz1 = Math.round(maxCz / CELL);
+    var r2 = radius * radius;
+    for (var gx = gx0; gx <= gx1; gx++) {
+      for (var gy = gy0; gy <= gy1; gy++) {
+        for (var gz = gz0; gz <= gz1; gz++) {
+          var arr = grid.get(gx + ',' + gy + ',' + gz);
+          if (!arr) continue;
+          for (var i = 0; i < arr.length; i++) {
+            var gid = arr[i];
+            if (gid === forceGid) continue;
+            var m = triMeta[gid];
+            var dx = m.cx - point.x, dy = m.cy - point.y, dz = m.cz - point.z;
+            if (dx * dx + dy * dy + dz * dz > r2) continue;
+            apply(gid);
+          }
+        }
+      }
+    }
+    touched.forEach(function (mi) { paintMeshes[mi].colorAttr.needsUpdate = true; });
+    if (reAdd.size) recomputeAreas();
+  }
+
+  function setTriColor(m, zonaId) {
+    var colorAttr = paintMeshes[m.meshIdx].colorAttr;
+    var col = zonaId === null ? [1, 1, 1] : hexToRgbArr(zonas.find(function (z) { return z.id === zonaId; }).colorHex);
+    var i0 = m.tri * 3;
+    colorAttr.setXYZ(i0, col[0], col[1], col[2]);
+    colorAttr.setXYZ(i0 + 1, col[0], col[1], col[2]);
+    colorAttr.setXYZ(i0 + 2, col[0], col[1], col[2]);
+  }
+  function hexToRgbArr(hex) {
+    return [((hex >> 16) & 255) / 255, ((hex >> 8) & 255) / 255, (hex & 255) / 255];
+  }
+
+  function recomputeAreas() {
+    var sums = {};
+    triOwner.forEach(function (zonaId, gid) {
+      sums[zonaId] = (sums[zonaId] || 0) + triMeta[gid].area;
+    });
+    zonas.forEach(function (z) { z.area = (sums[z.id] || 0) * scaleFactor * scaleFactor; });
+    renderZonaList();
+    updatePillZona();
+  }
+
+  // ================= UI de zonas =================
+  function renderZonaList() {
+    zonaList.innerHTML = '';
+    zonas.forEach(function (z) {
+      var row = document.createElement('div');
+      row.className = 'zona-item' + (z.id === activeZonaId ? ' active' : '');
+      row.innerHTML =
+        '<span class="swatch" style="background:#' + z.colorHex.toString(16).padStart(6, '0') + '"></span>' +
+        '<span class="zona-name">' + z.tag + '</span>' +
+        '<span class="zona-meta">' + z.codigo + ' · ' + tipoLabel(z.tipo) + '</span>' +
+        '<span class="zona-area mono">' + (z.area || 0).toFixed(2) + ' m²</span>' +
+        '<button class="icon-x" data-act="del" data-id="' + z.id + '">✕</button>';
+      row.addEventListener('click', function (ev) {
+        if (ev.target.dataset.act === 'del') {
+          eliminarZona(z.id);
+          return;
+        }
+        activeZonaId = z.id;
+        renderZonaList();
+        updatePillZona();
+      });
+      zonaList.appendChild(row);
+    });
+  }
+  function tipoLabel(t) {
+    return t === 'deck_wpc' ? 'Deck WPC' : (t === 'revestimiento_wpc' ? 'Revestim. WPC' : 'SPC');
+  }
+  function eliminarZona(id) {
+    triOwner.forEach(function (zonaId, gid) {
+      if (zonaId === id) { setTriColor(triMeta[gid], null); triOwner.delete(gid); }
+    });
+    paintMeshes.forEach(function (pm) { pm.colorAttr.needsUpdate = true; });
+    zonas = zonas.filter(function (z) { return z.id !== id; });
+    if (activeZonaId === id) activeZonaId = zonas.length ? zonas[0].id : null;
+    renderZonaList();
+    updatePillZona();
+  }
+  function updatePillZona() {
+    var z = zonas.find(function (zz) { return zz.id === activeZonaId; });
+    if (!z) {
+      pillZonaName.textContent = eraseMode ? 'Goma activa' : 'Sin zona activa — crea una';
+      pillZonaArea.textContent = '';
+      return;
+    }
+    pillZonaName.textContent = (eraseMode ? 'Goma · ' : '') + z.tag;
+    pillZonaArea.textContent = (z.area || 0).toFixed(2) + ' m² · ' + tipoLabel(z.tipo);
+  }
+
+  btnNuevaZona.addEventListener('click', function () {
+    zonaForm.hidden = false;
+    zTag.value = ''; zCodigo.value = ''; zTag.focus();
+  });
+  btnZonaCancelar.addEventListener('click', function () { zonaForm.hidden = true; });
+  btnZonaCrear.addEventListener('click', function () {
+    var tag = zTag.value.trim();
+    if (!tag) { zTag.focus(); return; }
+    var codigo = zCodigo.value.trim() || tag;
+    var z = {
+      id: 'z' + (zonaSeq++), tag: tag, codigo: codigo, tipo: zTipo.value, marca: zMarca.value.trim() || 'NewTechWood',
+      colorHex: PALETTE[zonas.length % PALETTE.length], area: 0
+    };
+    zonas.push(z);
+    activeZonaId = z.id;
+    eraseMode = false; fabErase.classList.remove('on');
+    zonaForm.hidden = true;
+    renderZonaList();
+    updatePillZona();
+  });
+
+  fabErase.addEventListener('click', function () {
+    eraseMode = !eraseMode;
+    fabErase.classList.toggle('on', eraseMode);
+    updatePillZona();
+  });
+
+  brushInput.addEventListener('input', function () {
+    brushRadius = parseFloat(brushInput.value);
+    brushVal.textContent = brushRadius.toFixed(2) + ' m';
+  });
+
+  fabSheet.addEventListener('click', function () {
+    sheet.hidden = !sheet.hidden;
+  });
+  document.getElementById('sheetHandle').addEventListener('click', function () {
+    sheet.hidden = true;
+  });
+
+  // ================= calibración de escala =================
+  btnCalibrar.addEventListener('click', function () {
+    var real = prompt('Mide en la vida real la distancia entre dos puntos fáciles de identificar en el escaneo (por ejemplo, el ancho de una puerta) y escribe aquí esa medida en metros:');
+    if (!real) return;
+    var realM = parseFloat(real);
+    if (!realM || realM <= 0) { alert('Escribe un número válido en metros, ej. 0.90'); return; }
+    var modelo = prompt('Ahora escribe cuántos metros mide esa misma distancia DENTRO del escaneo actual (usa el tamaño que ves antes de corregir; si no lo sabes, escribe 1 y ajustamos después visualmente):');
+    if (!modelo) return;
+    var modeloM = parseFloat(modelo);
+    if (!modeloM || modeloM <= 0) { alert('Escribe un número válido.'); return; }
+    scaleFactor = scaleFactor * (realM / modeloM);
+    scaleVal.textContent = scaleFactor.toFixed(3);
+    recomputeAreas();
+  });
+
+  // ================= exportar JSON =================
+  btnExport.addEventListener('click', function () {
+    if (!zonas.length) { alert('Todavía no hay ninguna zona marcada.'); return; }
+    var data = zonas.map(function (z) {
+      return { ubicacion: z.tag, codigo: z.codigo, area_m2: Math.round((z.area || 0) * 100) / 100, tipo: z.tipo, marca: z.marca };
+    });
+    var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'areas_escaneo.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  });
+
+  // ================= abrir herramienta =================
+  btnOpenTool.addEventListener('click', function () {
+    setupEl.hidden = true;
+    toolEl.hidden = false;
+    initRenderer();
+    enterFlatMode();
+    if (!rafId) animate();
+  });
+
+  // ---- modo pantalla: arrastrar para mirar alrededor (cámara fija en el
+  // centro del cuarto, como si giraras la cabeza/el cuerpo parado ahí) ----
+  var flatYaw = 0, flatPitch = 0;
+  function applyFlatLook() {
+    var e = new THREE.Euler(flatPitch, flatYaw, 0, 'YXZ');
+    rig.quaternion.setFromEuler(e);
+  }
+
+  function initRenderer() {
+    if (renderer) return;
+    renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    rt = new THREE.WebGLRenderTarget(1, 1, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter });
+    buildDistortPass();
+    window.addEventListener('resize', resize);
+    resize();
+
+    var dragging = false, lastX = 0, lastY = 0, moved = false;
+    canvas.addEventListener('pointerdown', function (ev) {
+      if (mode !== 'flat') return;
+      dragging = true; moved = false; lastX = ev.clientX; lastY = ev.clientY;
+    });
+    canvas.addEventListener('pointermove', function (ev) {
+      if (mode !== 'flat' || !dragging) return;
+      var dx = ev.clientX - lastX, dy = ev.clientY - lastY;
+      lastX = ev.clientX; lastY = ev.clientY;
+      if (Math.abs(dx) > 2 || Math.abs(dy) > 2) moved = true;
+      flatYaw -= dx * 0.006;
+      flatPitch -= dy * 0.006;
+      flatPitch = Math.max(-1.5, Math.min(1.5, flatPitch));
+      applyFlatLook();
+    });
+    window.addEventListener('pointerup', function () { dragging = false; });
   }
 
   function resize() {
     w = window.innerWidth; h = window.innerHeight;
     if (!renderer) return;
     renderer.setSize(w, h, false);
-    // three.js multiplica internamente los argumentos de setViewport/setScissor
-    // por el pixelRatio del renderer SIEMPRE, incluso cuando el destino es un
-    // WebGLRenderTarget propio (no la pantalla) — cuyo tamaño en texeles NO se
-    // escala solo. En un iPhone real (devicePixelRatio 2 o 3) eso desalinea
-    // los viewports de cada ojo respecto al tamaño real del render target,
-    // provocando que cada ojo muestre un recorte distinto y desalineado de
-    // una sola imagen estirada (el bug de "dos imágenes completamente
-    // distintas"). En Chromium de escritorio/headless (pixelRatio=1) el
-    // desfase desaparece, por eso no se reproducía en las pruebas locales.
-    // Fix: el render target debe tener su tamaño TAMBIÉN multiplicado por el
-    // mismo pixelRatio, para que quede en la misma escala que usan
-    // setViewport/setScissor internamente.
     var pr = renderer.getPixelRatio();
     rt.setSize(Math.round(w * pr), Math.round(h * pr));
+    flatCamera.aspect = w / h; flatCamera.updateProjectionMatrix();
     var eyeAspect = (w / 2) / h;
     cameraL.aspect = eyeAspect; cameraL.updateProjectionMatrix();
     cameraR.aspect = eyeAspect; cameraR.updateProjectionMatrix();
     distortMat.uniforms.aspectHalf.value = eyeAspect;
   }
 
-  var rafId = null;
-  function loop() {
-    rafId = requestAnimationFrame(loop);
-    setRigQuaternion(latest.alpha, latest.beta, latest.gamma, getScreenOrientAngle());
-
-    renderer.setRenderTarget(rt);
-    renderer.setScissorTest(true);
-    renderer.setViewport(0, 0, w / 2, h);
-    renderer.setScissor(0, 0, w / 2, h);
-    renderer.render(scene, cameraL);
-    renderer.setViewport(w / 2, 0, w / 2, h);
-    renderer.setScissor(w / 2, 0, w / 2, h);
-    renderer.render(scene, cameraR);
-    renderer.setScissorTest(false);
-
-    renderer.setRenderTarget(null);
-    renderer.setViewport(0, 0, w, h);
-    distortMat.uniforms.tex.value = rt.texture;
-    renderer.render(distortScene, distortCamera);
+  function enterFlatMode() {
+    mode = 'flat';
+    btnRecenter.hidden = true; btnExitVR.hidden = true;
+    applyFlatLook();
+    document.exitFullscreen && document.fullscreenElement && document.exitFullscreen().catch(function () {});
   }
 
-  function initRendererOnce() {
-    if (renderer) return;
-    renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    buildScene();
-    rt = new THREE.WebGLRenderTarget(1, 1, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter });
-    buildDistortPass();
-    window.addEventListener('resize', resize);
-    resize();
-  }
-
-  function requestFullscreenBestEffort(el) {
-    var target = el;
-    var fn = target.requestFullscreen || target.webkitRequestFullscreen || target.webkitEnterFullscreen;
-    if (!fn) {
-      // Safari en pestaña normal (no "Agregar a pantalla de inicio") a veces no expone
-      // la API en absoluto en este contexto; lo intentamos sobre <html> como respaldo.
-      target = document.documentElement;
-      fn = target.requestFullscreen || target.webkitRequestFullscreen;
+  fabVR.addEventListener('click', function () {
+    if (!sensorReady) {
+      sensorGate.textContent = 'Toca "Activar sensor" primero.';
+      sensorGate.className = 'status err';
+      btnSensorGate.hidden = false;
+      sheet.hidden = false;
+      return;
     }
-    if (!fn) return;
-    try {
-      var p = fn.call(target);
-      if (p && p.catch) p.catch(function () { /* iOS puede rechazar sin razón visible; se ignora */ });
-    } catch (e) { /* no crítico: el visor sigue funcionando sin pantalla completa */ }
-  }
-
-  btnEnter.addEventListener('click', function () {
-    try {
-      if (typeof THREE === 'undefined') {
-        throw new Error('THREE no está definido — la librería three.js no cargó (revisa tu conexión o bloqueador de contenido en Safari).');
-      }
-      initRendererOnce();
-      setupEl.hidden = true;
-      vrRoot.hidden = false;
-      yawOffsetDeg = latest.alpha || 0;
-      requestFullscreenBestEffort(vrRoot);
-      if (!rafId) loop();
-    } catch (err) {
-      diagLog.hidden = false;
-      diagLog.textContent = 'ERROR al entrar en modo visor:\n' + (err && err.message ? err.message : String(err)) + (err && err.stack ? ('\n\n' + err.stack) : '');
-      sensorStatus.textContent = 'No se pudo iniciar el visor 3D — ver el log de diagnóstico abajo.';
-      sensorStatus.className = 'status err';
-    }
+    enterVRMode();
+  });
+  btnSensorGate.addEventListener('click', function () {
+    requestSensor(function (ok) {
+      if (ok) { sheet.hidden = false; }
+    });
   });
 
-  btnExit.addEventListener('click', function () {
-    vrRoot.hidden = true;
-    setupEl.hidden = false;
-    if (document.fullscreenElement) { document.exitFullscreen().catch(function () {}); }
-    if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
-  });
-
-  btnRecenter.addEventListener('click', function () {
+  function enterVRMode() {
+    mode = 'vr';
+    sheet.hidden = true;
+    btnRecenter.hidden = false; btnExitVR.hidden = false;
     yawOffsetDeg = latest.alpha || 0;
-  });
+    dwellPoint = null; dwellMs = 0; painting = false;
+    requestFullscreenBestEffort(toolEl);
+  }
+  btnExitVR.addEventListener('click', enterFlatMode);
+  btnRecenter.addEventListener('click', function () { yawOffsetDeg = latest.alpha || 0; });
+
+  // ================= pintado por mirada (modo VR, sin control de manos) =================
+  var dwellPoint = null, dwellMs = 0, painting = false;
+  var DWELL_MS = 450, STEADY_EPS = 0.05;
+  var vrRaycaster = new THREE.Raycaster();
+  var lastT = performance.now();
+
+  function updateGaze(dt) {
+    var origin = new THREE.Vector3(); rig.getWorldPosition(origin);
+    var dir = new THREE.Vector3(0, 0, -1).applyQuaternion(rig.quaternion);
+    vrRaycaster.set(origin, dir);
+    var hits = vrRaycaster.intersectObjects(scanRoot.children, true);
+    if (!hits.length || (!zonas.length && !eraseMode)) {
+      dwellPoint = null; dwellMs = 0; painting = false;
+      drawReticle('#e7efec'); reticleTex.needsUpdate = true;
+      return;
+    }
+    var p = hits[0].point;
+    if (dwellPoint && p.distanceTo(dwellPoint) < STEADY_EPS) {
+      dwellMs += dt;
+    } else {
+      dwellPoint = p.clone(); dwellMs = 0; painting = false;
+    }
+    if (dwellMs >= DWELL_MS) {
+      painting = true;
+      var hitMeshIdx = hits[0].object.userData.meshIdx;
+      var forceGid = (hitMeshIdx !== undefined) ? paintMeshes[hitMeshIdx].triGlobalIds[hits[0].faceIndex] : undefined;
+      paintAt(p, brushRadius, eraseMode ? null : activeZonaId, forceGid);
+      drawReticle(eraseMode ? '#ff8266' : '#5fd4c0');
+    } else {
+      var frac = dwellMs / DWELL_MS;
+      drawReticle(frac > 0.5 ? '#e0a24a' : '#e7efec');
+    }
+    reticleTex.needsUpdate = true;
+  }
+
+  // ================= loop =================
+  function animate() {
+    rafId = requestAnimationFrame(animate);
+    var now = performance.now();
+    var dt = now - lastT; lastT = now;
+    if (!renderer) return;
+
+    if (mode === 'flat') {
+      updateGaze(dt);
+      renderer.setRenderTarget(null);
+      renderer.setViewport(0, 0, w, h);
+      renderer.render(scene, flatCamera);
+    } else {
+      setRigQuaternion(latest.alpha, latest.beta, latest.gamma, getScreenOrientAngle());
+      updateGaze(dt);
+
+      renderer.setRenderTarget(rt);
+      renderer.setScissorTest(true);
+      renderer.setViewport(0, 0, w / 2, h);
+      renderer.setScissor(0, 0, w / 2, h);
+      renderer.render(scene, cameraL);
+      renderer.setViewport(w / 2, 0, w / 2, h);
+      renderer.setScissor(w / 2, 0, w / 2, h);
+      renderer.render(scene, cameraR);
+      renderer.setScissorTest(false);
+
+      renderer.setRenderTarget(null);
+      renderer.setViewport(0, 0, w, h);
+      distortMat.uniforms.tex.value = rt.texture;
+      renderer.render(distortScene, distortCamera);
+    }
+  }
 })();
 </script>
