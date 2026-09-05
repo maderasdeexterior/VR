@@ -266,8 +266,12 @@
 
     <div class="controls">
       <label>
-        <span class="row-head"><span>Separación entre lentes (IPD)</span><span id="ipdVal" class="mono">63.0 mm</span></span>
+        <span class="row-head"><span>Tu separación pupilar (profundidad 3D)</span><span id="ipdVal" class="mono">63.0 mm</span></span>
         <input type="range" id="ipd" min="50" max="72" value="63" step="0.5">
+      </label>
+      <label>
+        <span class="row-head"><span>Ajuste de fusión (junta / separa las 2 imágenes)</span><span id="eyeShiftVal" class="mono">0%</span></span>
+        <input type="range" id="eyeShift" min="-10" max="10" value="0" step="0.5">
       </label>
       <label>
         <span class="row-head"><span>Distorsión de barril — k1</span><span id="k1Val" class="mono">0.22</span></span>
@@ -280,7 +284,7 @@
     </div>
 
     <button id="btnEnter" class="btn btn-primary" disabled>Entrar en modo visor</button>
-    <p class="hint">Dentro del visor, las líneas de la rejilla deben verse rectas — si se ven curvas hacia adentro, sube k1/k2; si se ven curvas hacia afuera, bájalos. Gira el teléfono a horizontal antes de insertarlo.</p>
+    <p class="hint">Dentro del visor, las líneas de la rejilla deben verse rectas — si se ven curvas hacia adentro, sube k1/k2; si se ven curvas hacia afuera, bájalos. Si las dos imágenes no funden en una sola: "Tu separación pupilar" es solo para la profundidad 3D, no corrige esto — usa "Ajuste de fusión": positivo las acerca, negativo las aleja. Muévelo poco a poco hasta que ambos ojos vean una sola imagen fundida, y entonces regresa la separación pupilar a un valor cercano a tu distancia real entre ojos (no hace falta que coincida con la del visor). Gira el teléfono a horizontal antes de insertarlo.</p>
   </div>
 </div>
 
@@ -310,9 +314,11 @@
   var valBeta = document.getElementById('valBeta');
   var valGamma = document.getElementById('valGamma');
   var ipdInput = document.getElementById('ipd');
+  var eyeShiftInput = document.getElementById('eyeShift');
   var k1Input = document.getElementById('k1');
   var k2Input = document.getElementById('k2');
   var ipdVal = document.getElementById('ipdVal');
+  var eyeShiftVal = document.getElementById('eyeShiftVal');
   var k1Val = document.getElementById('k1Val');
   var k2Val = document.getElementById('k2Val');
   var btnDiag = document.getElementById('btnDiag');
@@ -401,7 +407,7 @@
     diagLine('(si dice "granted" pero nunca aparece "primer evento recibido" tras mover el teléfono unos segundos, el permiso está bien pero el sistema no está entregando eventos — otra causa distinta)');
   });
 
-  var params = { ipdMm: 63, k1: 0.22, k2: 0.24 };
+  var params = { ipdMm: 63, eyeShift: 0, k1: 0.22, k2: 0.24 };
   var sensorReady = false;
   var latest = { alpha: 0, beta: 0, gamma: 0 };
   var yawOffsetDeg = 0;
@@ -410,6 +416,12 @@
     params.ipdMm = parseFloat(ipdInput.value);
     ipdVal.textContent = params.ipdMm.toFixed(1) + ' mm';
     updateEyeOffsets();
+  });
+  eyeShiftInput.addEventListener('input', function () {
+    var pct = parseFloat(eyeShiftInput.value);
+    params.eyeShift = pct / 100.0;
+    eyeShiftVal.textContent = (pct > 0 ? '+' : '') + pct.toFixed(1) + '%';
+    if (distortMat) distortMat.uniforms.eyeShift.value = params.eyeShift;
   });
   k1Input.addEventListener('input', function () {
     params.k1 = parseFloat(k1Input.value);
@@ -574,7 +586,8 @@
         tex: { value: null },
         k1: { value: params.k1 },
         k2: { value: params.k2 },
-        aspectHalf: { value: 1.0 }
+        aspectHalf: { value: 1.0 },
+        eyeShift: { value: params.eyeShift }
       },
       vertexShader: [
         'varying vec2 vUv;',
@@ -588,6 +601,7 @@
         'uniform float k1;',
         'uniform float k2;',
         'uniform float aspectHalf;',
+        'uniform float eyeShift;',
         'varying vec2 vUv;',
         'void main() {',
         '  float eyeCenter = vUv.x < 0.5 ? 0.25 : 0.75;',
@@ -596,7 +610,8 @@
         '  float r2 = dot(c, c);',
         '  vec2 d = c * (1.0 + k1 * r2 + k2 * r2 * r2);',
         '  d.x /= aspectHalf;',
-        '  vec2 uv = vec2(d.x * 0.5 + eyeCenter, d.y * 0.5 + 0.5);',
+        '  float shiftDir = vUv.x < 0.5 ? -1.0 : 1.0;',
+        '  vec2 uv = vec2(d.x * 0.5 + eyeCenter + shiftDir * eyeShift, d.y * 0.5 + 0.5);',
         '  float lo = vUv.x < 0.5 ? 0.0 : 0.5;',
         '  float hiBound = vUv.x < 0.5 ? 0.5 : 1.0;',
         '  if (uv.x < lo || uv.x > hiBound || uv.y < 0.0 || uv.y > 1.0) {',
