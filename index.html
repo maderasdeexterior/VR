@@ -639,7 +639,20 @@
     w = window.innerWidth; h = window.innerHeight;
     if (!renderer) return;
     renderer.setSize(w, h, false);
-    rt.setSize(w, h);
+    // three.js multiplica internamente los argumentos de setViewport/setScissor
+    // por el pixelRatio del renderer SIEMPRE, incluso cuando el destino es un
+    // WebGLRenderTarget propio (no la pantalla) — cuyo tamaño en texeles NO se
+    // escala solo. En un iPhone real (devicePixelRatio 2 o 3) eso desalinea
+    // los viewports de cada ojo respecto al tamaño real del render target,
+    // provocando que cada ojo muestre un recorte distinto y desalineado de
+    // una sola imagen estirada (el bug de "dos imágenes completamente
+    // distintas"). En Chromium de escritorio/headless (pixelRatio=1) el
+    // desfase desaparece, por eso no se reproducía en las pruebas locales.
+    // Fix: el render target debe tener su tamaño TAMBIÉN multiplicado por el
+    // mismo pixelRatio, para que quede en la misma escala que usan
+    // setViewport/setScissor internamente.
+    var pr = renderer.getPixelRatio();
+    rt.setSize(Math.round(w * pr), Math.round(h * pr));
     var eyeAspect = (w / 2) / h;
     cameraL.aspect = eyeAspect; cameraL.updateProjectionMatrix();
     cameraR.aspect = eyeAspect; cameraR.updateProjectionMatrix();
