@@ -1,3 +1,7 @@
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Puente VR</title>
 <style>
   :root {
@@ -674,6 +678,22 @@
     resize();
   }
 
+  function requestFullscreenBestEffort(el) {
+    var target = el;
+    var fn = target.requestFullscreen || target.webkitRequestFullscreen || target.webkitEnterFullscreen;
+    if (!fn) {
+      // Safari en pestaña normal (no "Agregar a pantalla de inicio") a veces no expone
+      // la API en absoluto en este contexto; lo intentamos sobre <html> como respaldo.
+      target = document.documentElement;
+      fn = target.requestFullscreen || target.webkitRequestFullscreen;
+    }
+    if (!fn) return;
+    try {
+      var p = fn.call(target);
+      if (p && p.catch) p.catch(function () { /* iOS puede rechazar sin razón visible; se ignora */ });
+    } catch (e) { /* no crítico: el visor sigue funcionando sin pantalla completa */ }
+  }
+
   btnEnter.addEventListener('click', function () {
     try {
       if (typeof THREE === 'undefined') {
@@ -683,7 +703,7 @@
       setupEl.hidden = true;
       vrRoot.hidden = false;
       yawOffsetDeg = latest.alpha || 0;
-      if (vrRoot.requestFullscreen) { vrRoot.requestFullscreen().catch(function () {}); }
+      requestFullscreenBestEffort(vrRoot);
       if (!rafId) loop();
     } catch (err) {
       diagLog.hidden = false;
