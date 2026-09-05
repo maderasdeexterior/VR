@@ -122,6 +122,24 @@
   .fab.on { background: var(--danger); color: #fff; }
   .fab.alt { background: #4ab0e0; color: #06211c; }
 
+  /* ---- halo de movimiento (caminar dentro de la escena) ---- */
+  .walk-halo {
+    position: fixed; left: 50%; top: 50%; width: 0; height: 0; z-index: 6; pointer-events: none;
+  }
+  .walk-halo[hidden] { display: none; }
+  .walk-center {
+    position: absolute; left: -18px; top: -18px; width: 36px; height: 36px; border-radius: 50%;
+    background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.3);
+    display: flex; align-items: center; justify-content: center; font-size: 15px; pointer-events: none;
+  }
+  .walk-btn {
+    position: absolute; width: 42px; height: 42px; margin-left: -21px; margin-top: -21px; border-radius: 50%;
+    background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.35); color: #fff; font-size: 19px;
+    display: flex; align-items: center; justify-content: center; pointer-events: auto; touch-action: none;
+    user-select: none; -webkit-user-select: none;
+  }
+  .walk-btn.active { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+
   /* ---- vista de cotización ---- */
   .cotiz-view {
     position: fixed; inset: 0; z-index: 20; background: var(--bg); color: var(--text);
@@ -176,9 +194,22 @@
 
   <div class="fab-row">
     <button id="fabPlaneMode" class="fab ghost" title="Modo: seleccionar el plano completo de un vistazo (toca para cambiar a pincel manual)">🧱</button>
+    <button id="fabWalk" class="fab ghost" title="Modo movimiento (caminar dentro de la escena)">🕹️</button>
     <button id="fabErase" class="fab ghost" title="Goma (borrar)">⌫</button>
     <button id="fabVR" class="fab ghost" title="Entrar en modo VR">🥽</button>
     <button id="fabSheet" class="fab" title="Zonas y materiales">☰</button>
+  </div>
+
+  <div id="walkHalo" class="walk-halo" hidden>
+    <div class="walk-center">🧍</div>
+    <button class="walk-btn" data-dir="F"  style="left:0px;    top:-60px;"  title="Caminar adelante">↑</button>
+    <button class="walk-btn" data-dir="FR" style="left:42px;  top:-42px;"  title="Caminar adelante-derecha">↗</button>
+    <button class="walk-btn" data-dir="R"  style="left:60px;  top:0px;"    title="Caminar a la derecha">→</button>
+    <button class="walk-btn" data-dir="BR" style="left:42px;  top:42px;"   title="Caminar atrás-derecha">↘</button>
+    <button class="walk-btn" data-dir="B"  style="left:0px;   top:60px;"   title="Caminar atrás">↓</button>
+    <button class="walk-btn" data-dir="BL" style="left:-42px; top:42px;"   title="Caminar atrás-izquierda">↙</button>
+    <button class="walk-btn" data-dir="L"  style="left:-60px; top:0px;"    title="Caminar a la izquierda">←</button>
+    <button class="walk-btn" data-dir="FL" style="left:-42px; top:-42px;"  title="Caminar adelante-izquierda">↖</button>
   </div>
 
   <div id="sheet" class="sheet">
@@ -292,6 +323,8 @@
   var fabErase = document.getElementById('fabErase');
   var fabPlaneMode = document.getElementById('fabPlaneMode');
   var fabVR = document.getElementById('fabVR');
+  var fabWalk = document.getElementById('fabWalk');
+  var walkHalo = document.getElementById('walkHalo');
   var btnRecenter = document.getElementById('btnRecenter');
   var btnExitVR = document.getElementById('btnExitVR');
   var pillZonaName = document.getElementById('pillZonaName');
@@ -1178,6 +1211,62 @@
     resetDwell();
   });
 
+  // ================= modo movimiento (caminar dentro de la escena) =================
+  // Halo fijo al centro de la pantalla con 8 botones direccionales (los 4
+  // cardinales + sus 4 intermedios). El movimiento es relativo a hacia
+  // dónde se está mirando en ese instante (como en un videojuego), no a un
+  // eje fijo del mundo, para que "adelante" siempre sea "hacia donde miro".
+  var walkMode = false;
+  var activeWalkDir = null;
+  var WALK_SPEED_MPS = 1.4; // paso caminando normal
+
+  function setWalkActiveBtn(dirKey) {
+    var btns = walkHalo.querySelectorAll('.walk-btn');
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].classList.toggle('active', dirKey !== null && btns[i].getAttribute('data-dir') === dirKey);
+    }
+  }
+
+  fabWalk.addEventListener('click', function () {
+    walkMode = !walkMode;
+    fabWalk.classList.toggle('on', walkMode);
+    walkHalo.hidden = !walkMode;
+    activeWalkDir = null;
+    setWalkActiveBtn(null);
+    resetDwell();
+  });
+
+  Array.prototype.forEach.call(walkHalo.querySelectorAll('.walk-btn'), function (btn) {
+    var dir = btn.getAttribute('data-dir');
+    function start(ev) { if (ev.cancelable) ev.preventDefault(); activeWalkDir = dir; setWalkActiveBtn(dir); }
+    function stop() { if (activeWalkDir === dir) { activeWalkDir = null; setWalkActiveBtn(null); } }
+    btn.addEventListener('pointerdown', start);
+    btn.addEventListener('pointerenter', start);
+    btn.addEventListener('pointerup', stop);
+    btn.addEventListener('pointerleave', stop);
+    btn.addEventListener('pointercancel', stop);
+  });
+
+  function updateWalk(dt) {
+    if (!activeWalkDir) return;
+    var camDir = new THREE.Vector3(0, 0, -1).applyQuaternion(rig.quaternion);
+    camDir.y = 0;
+    if (camDir.lengthSq() < 1e-6) camDir.set(0, 0, -1); else camDir.normalize();
+    var camRight = new THREE.Vector3(1, 0, 0).applyQuaternion(rig.quaternion);
+    camRight.y = 0;
+    if (camRight.lengthSq() < 1e-6) camRight.set(1, 0, 0); else camRight.normalize();
+
+    var move = new THREE.Vector3();
+    if (activeWalkDir.indexOf('F') !== -1) move.add(camDir);
+    if (activeWalkDir.indexOf('B') !== -1) move.sub(camDir);
+    if (activeWalkDir.indexOf('R') !== -1) move.add(camRight);
+    if (activeWalkDir.indexOf('L') !== -1) move.sub(camRight);
+    if (move.lengthSq() < 1e-6) return;
+    move.normalize().multiplyScalar(WALK_SPEED_MPS * dt / 1000);
+    rig.position.x += move.x;
+    rig.position.z += move.z;
+  }
+
   brushInput.addEventListener('input', function () {
     brushRadius = parseFloat(brushInput.value);
     brushVal.textContent = brushRadius.toFixed(2) + ' m';
@@ -1435,6 +1524,12 @@
 
   // ================= abrir herramienta =================
   btnOpenTool.addEventListener('click', function () {
+    // La pantalla completa hay que pedirla lo antes posible dentro del
+    // mismo gesto de "click" del usuario — si se pide después de otras
+    // llamadas asíncronas, algunos navegadores ya no la conceden. Antes
+    // solo se pedía al entrar a modo VR, así que el modo visor normal
+    // ("pantalla") nunca quedaba en pantalla completa.
+    requestFullscreenBestEffort(toolEl);
     setupEl.hidden = true;
     toolEl.hidden = false;
     initRenderer();
@@ -1494,7 +1589,12 @@
     mode = 'flat';
     btnRecenter.hidden = true; btnExitVR.hidden = true;
     applyFlatLook();
-    document.exitFullscreen && document.fullscreenElement && document.exitFullscreen().catch(function () {});
+    // Ojo: antes esta función salía de pantalla completa siempre que se
+    // entraba a modo "pantalla" — lo cual también disparaba al volver de
+    // VR, apagando la pantalla completa aunque siguiéramos dentro del
+    // visor. Pantalla completa ahora se pide una sola vez al abrir la
+    // herramienta (ver btnOpenTool) y se mantiene mientras el visor esté
+    // abierto, sin importar si se entra o sale del sub-modo VR.
   }
 
   fabVR.addEventListener('click', function () {
@@ -1548,7 +1648,10 @@
     // nueva podía pintar de golpe lo que sea que estuviera al frente en
     // ese momento (mucho más grave ahora que un solo dwell puede pintar
     // un plano ENTERO en vez de solo un parche de pincel).
-    if (!sheet.hidden) {
+    // Mientras el modo movimiento está activo, la intención es caminar por
+    // la escena, no pintar — se apaga el "dwell" para no marcar zonas sin
+    // querer solo por quedarse mirando algo fijo mientras uno camina.
+    if (!sheet.hidden || walkMode) {
       dwellPoint = null; dwellMs = 0; painting = false; dwellFired = false;
       drawReticle('#e7efec'); reticleTex.needsUpdate = true;
       return;
@@ -1602,6 +1705,8 @@
     var now = performance.now();
     var dt = now - lastT; lastT = now;
     if (!renderer) return;
+
+    updateWalk(dt);
 
     if (mode === 'flat') {
       updateGaze(dt);
