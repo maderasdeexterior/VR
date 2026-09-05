@@ -1,3 +1,4 @@
+<meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -120,6 +121,30 @@
   .fab.ghost { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
   .fab.on { background: var(--danger); color: #fff; }
   .fab.alt { background: #4ab0e0; color: #06211c; }
+
+  /* ---- vista de cotización ---- */
+  .cotiz-view {
+    position: fixed; inset: 0; z-index: 20; background: var(--bg); color: var(--text);
+    display: flex; flex-direction: column;
+  }
+  .cotiz-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: calc(12px + env(safe-area-inset-top, 0px)) 16px 12px; border-bottom: 1px solid var(--border);
+  }
+  .cotiz-header h2 { margin: 0; font-size: 18px; }
+  .cotiz-body { flex: 1; overflow-y: auto; padding: 14px 16px; }
+  .cotiz-section { margin-bottom: 16px; }
+  .cotiz-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
+  .cotiz-table th, .cotiz-table td { border: 1px solid var(--border); padding: 6px 8px; text-align: left; vertical-align: top; }
+  .cotiz-table th { background: var(--surface-2); font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em; }
+  .cotiz-table td.num, .cotiz-table th.num { text-align: right; font-family: 'JetBrains Mono', monospace; white-space: nowrap; }
+  .cotiz-totales { margin-top: 10px; text-align: right; font-size: 13.5px; }
+  .cotiz-totales .total-final { font-weight: 700; font-size: 16px; color: var(--accent); }
+  .cotiz-footer {
+    display: flex; gap: 10px; padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid var(--border); background: var(--surface);
+  }
+  .cotiz-footer .btn { margin-top: 0; }
 </style>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700&family=JetBrains+Mono:wght@400;500&display=swap">
 
@@ -193,9 +218,54 @@
       </div>
     </div>
 
-    <button id="btnExport" class="btn btn-primary">Descargar resumen (JSON) para cotizar</button>
+    <button id="btnCotizar" class="btn btn-primary">Generar cotización</button>
+    <button id="btnExport" class="btn btn-ghost" style="margin-top:8px;">Descargar resumen (JSON) para cotizar</button>
     <p class="hint" id="scaleHint">Factor de escala: <span id="scaleVal" class="mono">1.00</span> — si conoces una medida real del espacio, usa "Calibrar escala" para corregirlo.</p>
     <button id="btnCalibrar" class="btn btn-ghost">Calibrar escala con una medida conocida</button>
+  </div>
+
+  <div id="cotizacionView" class="cotiz-view" hidden>
+    <div class="cotiz-header">
+      <h2>Cotización</h2>
+      <button id="btnCotizCerrar" class="icon-btn" style="position:static; background:var(--surface-2); color:var(--text); border:1px solid var(--border);" title="Cerrar">✕</button>
+    </div>
+    <div class="cotiz-body">
+      <div class="cotiz-section">
+        <label class="field">Proyecto</label>
+        <input type="text" id="cProyecto" placeholder="Nombre del proyecto">
+        <label class="field">Cliente / contacto</label>
+        <input type="text" id="cContacto" placeholder="Nombre del cliente">
+        <div style="display:flex; gap:8px;">
+          <div style="flex:1;">
+            <label class="field">Teléfono</label>
+            <input type="text" id="cTel" placeholder="33...">
+          </div>
+          <div style="flex:1;">
+            <label class="field">Folio</label>
+            <input type="text" id="cFolio" placeholder="(pendiente)">
+          </div>
+        </div>
+        <label class="field">Dirección</label>
+        <input type="text" id="cDireccion" placeholder="Dirección del proyecto">
+        <div class="row-head" style="margin-top:8px;"><span>Tipo de cambio (MXN por USD)</span></div>
+        <input type="text" id="cTipoCambio" inputmode="decimal">
+        <p class="hint" style="margin:4px 0 0;">Confírmalo contra el DOF del día antes de enviar la cotización al cliente.</p>
+      </div>
+
+      <div id="cotizError" class="status err" hidden></div>
+
+      <div class="cotiz-section" id="cotizPreview">
+        <div class="row-head" style="margin-top:2px;"><span>Vista previa</span></div>
+        <div style="overflow-x:auto;">
+          <table class="cotiz-table" id="cotizTabla"></table>
+        </div>
+        <div class="cotiz-totales" id="cotizTotales"></div>
+      </div>
+    </div>
+    <div class="cotiz-footer">
+      <button id="btnCotizCompartir" class="btn btn-primary">Compartir PDF</button>
+      <button id="btnCotizDescargar" class="btn btn-ghost">Descargar PDF</button>
+    </div>
   </div>
 </div>
 
@@ -203,6 +273,8 @@
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/DRACOLoader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/libs/meshopt_decoder.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script>
 (function () {
   "use strict";
@@ -241,6 +313,158 @@
   var btnExport = document.getElementById('btnExport');
   var btnCalibrar = document.getElementById('btnCalibrar');
   var scaleVal = document.getElementById('scaleVal');
+
+  var btnCotizar = document.getElementById('btnCotizar');
+  var cotizacionView = document.getElementById('cotizacionView');
+  var btnCotizCerrar = document.getElementById('btnCotizCerrar');
+  var cProyecto = document.getElementById('cProyecto');
+  var cContacto = document.getElementById('cContacto');
+  var cTel = document.getElementById('cTel');
+  var cFolio = document.getElementById('cFolio');
+  var cDireccion = document.getElementById('cDireccion');
+  var cTipoCambio = document.getElementById('cTipoCambio');
+  var cotizError = document.getElementById('cotizError');
+  var cotizPreview = document.getElementById('cotizPreview');
+  var cotizTabla = document.getElementById('cotizTabla');
+  var cotizTotales = document.getElementById('cotizTotales');
+  var btnCotizCompartir = document.getElementById('btnCotizCompartir');
+  var btnCotizDescargar = document.getElementById('btnCotizDescargar');
+
+  // ================= motor de costeo (portado de costeo.py) =================
+  // Mismas reglas y catálogos que costeo.py — cualquier cambio de precios o
+  // reglas de negocio debe reflejarse en AMBOS archivos para que la
+  // cotización generada aquí siga cuadrando con la del script de escritorio.
+  var MARGEN_INSTALACION = 0.30;
+  var TIPO_CAMBIO_DEFAULT = 16.9755; // DOF -- confirmar contra el tipo de cambio del día real
+
+  var BASTIDOR = {
+    '2x1': { costo_tramo_mxn: 600, largo_tramo_m: 6.0, espaciamiento_m: 0.40 },
+    '1_1_2': { costo_tramo_mxn: 800, largo_tramo_m: 6.0, espaciamiento_m: 0.60 }
+  };
+  var LABOR_MXN_M2 = { bastidor_estandar: 350, bastidor_piso_directo: 120, wpc_habilitado: 280, spc_habilitado: 150 };
+  var LOGISTICA_BASE_MXN = { insumos_wpc: 1200, insumos_spc: 600, flete_acarreo: 1000, gasolina: 1050 };
+  var MANIOBRAS_DEFAULT_MXN = 0;
+  var MATERIAL_PUBLICO_USD_M2 = { 'DECK UH02': 73.00, 'UH67': 57.00, 'SPC-02': 47.00 };
+  var CLIPS = {
+    TC2JB: { precio_caja_usd: 70.50, pzas_caja: 250, clips_m2: 21 },
+    AW08: { precio_caja_usd: 75.00, pzas_caja: 250, clips_m2: 25 }
+  };
+  var DESCRIPCION_POR_TIPO = {
+    deck_wpc: 'Suministro y habilitado de deck WPC, incluye: bastidor de aluminio, corte, trazo, insumos, limpieza básica, flete y acarreo de materiales.',
+    revestimiento_wpc: 'Suministro y habilitado de revestimiento/plafón WPC, incluye: clips de fijación, corte, trazo, insumos, limpieza básica, flete y acarreo de materiales.',
+    spc: 'Suministro y habilitado de piso SPC, incluye: insumos, limpieza básica, flete y acarreo de materiales.'
+  };
+
+  function round2(n) { return Math.round((n + Number.EPSILON) * 100) / 100; }
+  function tierMultiplier(areaM2) {
+    if (areaM2 <= 0) return 1;
+    var tier = Math.ceil(areaM2 / 50);
+    return Math.pow(2, Math.max(0, tier - 1));
+  }
+  function tramosBastidor(areaM2, perfil) {
+    var b = BASTIDOR[perfil];
+    return Math.ceil(areaM2 / (b.espaciamiento_m * b.largo_tramo_m));
+  }
+
+  // Lanza un Error con mensaje en español si el código no existe en el
+  // catálogo — el llamador lo captura para mostrarlo de forma clara en la
+  // pantalla de cotización en vez de tronar la app.
+  function calcularPartida(tag, areaM2, tipo, opts) {
+    opts = opts || {};
+    var tipoCambio = opts.tipoCambio !== undefined ? opts.tipoCambio : TIPO_CAMBIO_DEFAULT;
+    var incluirCalzado = opts.incluirCalzado !== undefined ? opts.incluirCalzado : true;
+    var bastidorDirectoAPiso = !!opts.bastidorDirectoAPiso;
+    var maniobrasMxn = opts.maniobrasMxn !== undefined ? opts.maniobrasMxn : MANIOBRAS_DEFAULT_MXN;
+    var logisticaOverrideMxn = opts.logisticaOverrideMxn;
+
+    var precioPubUsd = MATERIAL_PUBLICO_USD_M2[tag];
+    if (precioPubUsd === undefined) {
+      throw new Error('Sin precio público en catálogo para "' + tag + '"');
+    }
+    var materialMxn = areaM2 * precioPubUsd * tipoCambio;
+
+    var clipCode = tipo === 'deck_wpc' ? 'TC2JB' : (tipo === 'revestimiento_wpc' ? 'AW08' : null);
+    var clipsMxn = 0, clipsCajas = null;
+    if (clipCode) {
+      var c = CLIPS[clipCode];
+      clipsCajas = Math.ceil(areaM2 * c.clips_m2 / c.pzas_caja);
+      clipsMxn = clipsCajas * c.precio_caja_usd * tipoCambio;
+    }
+    var materialTotalMxn = materialMxn + clipsMxn;
+
+    var insumosBaseKey = tipo === 'spc' ? 'insumos_spc' : 'insumos_wpc';
+    var logisticaTotal, logisticaCompartida;
+    if (logisticaOverrideMxn !== undefined && logisticaOverrideMxn !== null) {
+      logisticaTotal = logisticaOverrideMxn; logisticaCompartida = true;
+    } else {
+      logisticaTotal = (LOGISTICA_BASE_MXN[insumosBaseKey] + LOGISTICA_BASE_MXN.flete_acarreo + LOGISTICA_BASE_MXN.gasolina) * tierMultiplier(areaM2);
+      logisticaCompartida = false;
+    }
+
+    var costoInstalacion = 0;
+    if (tipo === 'deck_wpc') {
+      var t2x1 = tramosBastidor(areaM2, '2x1');
+      var costoBastidorMat = t2x1 * BASTIDOR['2x1'].costo_tramo_mxn;
+      if (incluirCalzado) {
+        var tCalzado = tramosBastidor(areaM2, '1_1_2');
+        costoBastidorMat += tCalzado * BASTIDOR['1_1_2'].costo_tramo_mxn;
+      }
+      var laborBastidor = areaM2 * (bastidorDirectoAPiso ? LABOR_MXN_M2.bastidor_piso_directo : LABOR_MXN_M2.bastidor_estandar);
+      var laborHabilitado = areaM2 * LABOR_MXN_M2.wpc_habilitado;
+      costoInstalacion = costoBastidorMat + laborBastidor + laborHabilitado;
+    } else if (tipo === 'revestimiento_wpc') {
+      costoInstalacion = areaM2 * LABOR_MXN_M2.wpc_habilitado;
+    } else if (tipo === 'spc') {
+      costoInstalacion = areaM2 * LABOR_MXN_M2.spc_habilitado;
+    } else {
+      throw new Error('tipo desconocido: ' + tipo);
+    }
+    costoInstalacion += logisticaTotal + maniobrasMxn;
+    var ventaInstalacion = costoInstalacion / (1 - MARGEN_INSTALACION);
+
+    return {
+      tag: tag, area_m2: round2(areaM2), tipo: tipo,
+      clips_codigo: clipCode, clips_cajas: clipsCajas,
+      logistica_compartida: logisticaCompartida, logistica_mxn: round2(logisticaTotal),
+      material_mxn: round2(materialTotalMxn),
+      instalacion_costo_mxn: round2(costoInstalacion),
+      instalacion_venta_mxn: round2(ventaInstalacion),
+      total_venta_mxn: round2(materialTotalMxn + ventaInstalacion)
+    };
+  }
+
+  // partidas: [{tag, area, tipo, marca}] -- misma regla que costeo.py:
+  // partidas <=20m2 de la MISMA marca (y misma canasta de insumos wpc/spc)
+  // comparten una sola carga logística a prorrata de área; >20m2 siempre
+  // independiente. El resultado respeta el orden de entrada.
+  function cotizarProyecto(partidas, tipoCambio) {
+    var resultados = new Array(partidas.length).fill(null);
+    var grupos = new Map();
+    var independientes = [];
+    partidas.forEach(function (p, idx) {
+      var canasta = p.tipo === 'spc' ? 'insumos_spc' : 'insumos_wpc';
+      if (p.area <= 20) {
+        var key = p.marca + '|' + canasta;
+        if (!grupos.has(key)) grupos.set(key, []);
+        grupos.get(key).push({ idx: idx, tag: p.tag, area: p.area, tipo: p.tipo });
+      } else {
+        independientes.push({ idx: idx, tag: p.tag, area: p.area, tipo: p.tipo });
+      }
+    });
+    grupos.forEach(function (miembros, key) {
+      var canasta = key.split('|')[1];
+      var areaTotal = miembros.reduce(function (s, m) { return s + m.area; }, 0);
+      var logisticaTotalGrupo = (LOGISTICA_BASE_MXN[canasta] + LOGISTICA_BASE_MXN.flete_acarreo + LOGISTICA_BASE_MXN.gasolina) * tierMultiplier(areaTotal);
+      miembros.forEach(function (m) {
+        var share = areaTotal ? logisticaTotalGrupo * (m.area / areaTotal) : 0;
+        resultados[m.idx] = calcularPartida(m.tag, m.area, m.tipo, { tipoCambio: tipoCambio, logisticaOverrideMxn: share });
+      });
+    });
+    independientes.forEach(function (m) {
+      resultados[m.idx] = calcularPartida(m.tag, m.area, m.tipo, { tipoCambio: tipoCambio });
+    });
+    return resultados;
+  }
 
   // ================= estado =================
   var PALETTE = [0x5fd4c0, 0xe0a24a, 0xe0644a, 0x8a6fe0, 0x4ab0e0, 0xd7e04a, 0xe06fbf, 0x6fe08a];
@@ -676,16 +900,76 @@
       }
 
       if (areaAcc >= PLANE_MIN_AREA) {
-        var planeIdx = planes.length;
         planes.push({
           gids: regionGids, area: areaAcc,
           normal: normalAcc.clone().normalize(),
-          origin: centroidAcc.clone().multiplyScalar(1 / areaAcc),
-          tint: -1
+          origin: centroidAcc.clone().multiplyScalar(1 / areaAcc)
         });
-        regionGids.forEach(function (g) { triPlane.set(g, planeIdx); });
       }
     }
+
+    // ---- segunda pasada: fusionar regiones casi-coplanares entre sí ----
+    // El crecimiento anterior es estricto paso a paso (para no "envolver"
+    // por error una esquina real) — pero un escaneo real trae ruido
+    // geométrico genuino (Polycam/ARKit a veces agrega detalle de más
+    // justo donde hay un cambio de tono/sombra fuerte, aunque la
+    // superficie real sea plana), y eso puede partir un muro/piso que es
+    // UNA sola superficie en varios pedazos desconectados en la malla.
+    // Aquí usamos un criterio más flexible, a nivel de REGIÓN completa (su
+    // plano ya ajustado, no un solo paso): si dos regiones caen
+    // prácticamente sobre el mismo plano real, las tratamos como una sola
+    // superficie seleccionable, aunque no compartan arista directamente.
+    var MERGE_ANGLE_COS = Math.cos(THREE.MathUtils.degToRad(25));
+    var MERGE_DIST_THRESH = 0.12; // 12cm, medido con datos reales de un escaneo con ruido típico
+
+    var parent = planes.map(function (_, i) { return i; });
+    function find(i) { while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; } return i; }
+
+    for (var pass = 0; pass < 3; pass++) {
+      var mergedAny = false;
+      for (var pi = 0; pi < planes.length; pi++) {
+        if (find(pi) !== pi) continue; // ya fusionada en una pasada anterior
+        for (var pj = pi + 1; pj < planes.length; pj++) {
+          var ri = find(pi), rj = find(pj);
+          if (ri === rj) continue;
+          var A = planes[ri], B = planes[rj];
+          if (Math.abs(A.normal.dot(B.normal)) < MERGE_ANGLE_COS) continue;
+          // promedio de la distancia medida con cada normal (en vez del máximo):
+          // si las dos regiones no quedaron EXACTAMENTE paralelas (normal
+          // promediada con ruido durante el crecimiento) y sus centroides
+          // están lateralmente separados, medir con una sola normal puede
+          // sobrestimar la distancia real entre los planos — promediar
+          // ambas direcciones da una estimación más estable.
+          var dAB = Math.abs((B.origin.x - A.origin.x) * A.normal.x + (B.origin.y - A.origin.y) * A.normal.y + (B.origin.z - A.origin.z) * A.normal.z);
+          var dBA = Math.abs((A.origin.x - B.origin.x) * B.normal.x + (A.origin.y - B.origin.y) * B.normal.y + (A.origin.z - B.origin.z) * B.normal.z);
+          if ((dAB + dBA) / 2 > MERGE_DIST_THRESH) continue;
+
+          var wA = A.area, wB = B.area;
+          var alignedBn = B.normal.dot(A.normal) < 0 ? B.normal.clone().negate() : B.normal;
+          A.normal = A.normal.clone().multiplyScalar(wA).addScaledVector(alignedBn, wB).normalize();
+          A.origin = A.origin.clone().multiplyScalar(wA).addScaledVector(B.origin, wB).multiplyScalar(1 / (wA + wB));
+          A.area = wA + wB;
+          A.gids = A.gids.concat(B.gids);
+          parent[rj] = ri;
+          mergedAny = true;
+        }
+      }
+      if (!mergedAny) break;
+    }
+
+    // compactar: solo las raíces sobreviven, con `tint` ya listo para asignar
+    var finalPlanes = [];
+    var rootToFinalIdx = new Map();
+    for (var origIdx = 0; origIdx < planes.length; origIdx++) {
+      var root = find(origIdx);
+      if (!rootToFinalIdx.has(root)) {
+        rootToFinalIdx.set(root, finalPlanes.length);
+        planes[root].tint = -1;
+        finalPlanes.push(planes[root]);
+      }
+    }
+    planes = finalPlanes;
+    planes.forEach(function (pl, idx) { pl.gids.forEach(function (g) { triPlane.set(g, idx); }); });
 
     // adyacencia entre PLANOS (para que dos superficies contiguas no
     // queden con el mismo tinte) + coloreado voraz con una paleta chica
@@ -936,6 +1220,217 @@
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
+  });
+
+  // ================= cotización dentro de la app =================
+  // Misma agrupación de logística compartida que cotizar_proyecto() en
+  // costeo.py, pero capturando errores POR PARTIDA (un código de catálogo
+  // faltante en una zona no debe tronar la cotización completa — solo esa
+  // fila se marca con advertencia y se excluye de los totales).
+  function cotizarProyectoSafe(partidas, tipoCambio) {
+    var resultados = new Array(partidas.length).fill(null);
+    var grupos = new Map();
+    var independientes = [];
+    partidas.forEach(function (p, idx) {
+      var canasta = p.tipo === 'spc' ? 'insumos_spc' : 'insumos_wpc';
+      if (p.area <= 20) {
+        var key = p.marca + '|' + canasta;
+        if (!grupos.has(key)) grupos.set(key, []);
+        grupos.get(key).push({ idx: idx, tag: p.tag, area: p.area, tipo: p.tipo });
+      } else {
+        independientes.push({ idx: idx, tag: p.tag, area: p.area, tipo: p.tipo });
+      }
+    });
+    grupos.forEach(function (miembros, key) {
+      var canasta = key.split('|')[1];
+      var areaTotal = miembros.reduce(function (s, m) { return s + m.area; }, 0);
+      var logisticaTotalGrupo = (LOGISTICA_BASE_MXN[canasta] + LOGISTICA_BASE_MXN.flete_acarreo + LOGISTICA_BASE_MXN.gasolina) * tierMultiplier(areaTotal);
+      miembros.forEach(function (m) {
+        var share = areaTotal ? logisticaTotalGrupo * (m.area / areaTotal) : 0;
+        try {
+          resultados[m.idx] = { ok: true, detalle: calcularPartida(m.tag, m.area, m.tipo, { tipoCambio: tipoCambio, logisticaOverrideMxn: share }) };
+        } catch (err) {
+          resultados[m.idx] = { ok: false, error: err.message, tag: m.tag };
+        }
+      });
+    });
+    independientes.forEach(function (m) {
+      try {
+        resultados[m.idx] = { ok: true, detalle: calcularPartida(m.tag, m.area, m.tipo, { tipoCambio: tipoCambio }) };
+      } catch (err) {
+        resultados[m.idx] = { ok: false, error: err.message, tag: m.tag };
+      }
+    });
+    return resultados;
+  }
+
+  function fmtMxn(n) { return '$' + n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
+  var lastCotizCalc = null; // {rows, subtotal, iva, total} -- recalculado cada vez que se abre/edita
+
+  function renderCotizPreview() {
+    var tipoCambio = parseFloat(cTipoCambio.value) || TIPO_CAMBIO_DEFAULT;
+    var partidas = zonas.map(function (z) { return { tag: z.codigo, area: z.area || 0, tipo: z.tipo, marca: z.marca, zona: z }; });
+    var resultados = cotizarProyectoSafe(partidas, tipoCambio);
+
+    var rows = [];
+    var errores = [];
+    var subtotal = 0;
+    resultados.forEach(function (r, i) {
+      var z = zonas[i];
+      if (r.ok) {
+        rows.push({ zona: z, detalle: r.detalle, importe: r.detalle.total_venta_mxn });
+        subtotal += r.detalle.total_venta_mxn;
+      } else {
+        errores.push(z.tag + ' (código "' + z.codigo + '"): ' + r.error);
+        rows.push({ zona: z, error: r.error });
+      }
+    });
+    var iva = subtotal * 0.16;
+    var total = subtotal + iva;
+    lastCotizCalc = { rows: rows, subtotal: subtotal, iva: iva, total: total, tipoCambio: tipoCambio };
+
+    if (errores.length) {
+      cotizError.hidden = false;
+      cotizError.textContent = 'Faltan precios de catálogo para poder cotizar estas zonas (se excluyen del total mientras tanto): ' + errores.join(' · ');
+    } else {
+      cotizError.hidden = true;
+      cotizError.textContent = '';
+    }
+
+    var thead = '<thead><tr><th>#</th><th>Código</th><th>Zona</th><th>Tipo</th><th class="num">Área</th><th class="num">P.U.</th><th class="num">Importe</th></tr></thead>';
+    var tbody = '<tbody>' + rows.map(function (r, i) {
+      if (r.error) {
+        return '<tr><td>' + (i + 1) + '</td><td>' + r.zona.codigo + '</td><td>' + r.zona.tag + '</td><td colspan="4" style="color:var(--danger);">⚠ sin precio en catálogo</td></tr>';
+      }
+      var d = r.detalle;
+      return '<tr><td>' + (i + 1) + '</td><td>' + r.zona.codigo + '</td><td>' + r.zona.tag + '</td><td>' + tipoLabel(r.zona.tipo) + '</td>' +
+        '<td class="num">' + d.area_m2.toFixed(2) + ' m²</td><td class="num">' + fmtMxn(d.total_venta_mxn) + '</td><td class="num">' + fmtMxn(d.total_venta_mxn) + '</td></tr>';
+    }).join('') + '</tbody>';
+    cotizTabla.innerHTML = thead + tbody;
+
+    cotizTotales.innerHTML =
+      '<div>Subtotal: ' + fmtMxn(subtotal) + '</div>' +
+      '<div>IVA 16%: ' + fmtMxn(iva) + '</div>' +
+      '<div class="total-final">Total: ' + fmtMxn(total) + '</div>';
+  }
+
+  function openCotizacion() {
+    if (!zonas.length) { alert('Todavía no hay ninguna zona marcada.'); return; }
+    if (!cTipoCambio.value) cTipoCambio.value = TIPO_CAMBIO_DEFAULT;
+    cotizacionView.hidden = false;
+    renderCotizPreview();
+  }
+  btnCotizar.addEventListener('click', openCotizacion);
+  btnCotizCerrar.addEventListener('click', function () { cotizacionView.hidden = true; });
+  cTipoCambio.addEventListener('input', renderCotizPreview);
+
+  function hoyEnEspanol() {
+    var meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+    var d = new Date();
+    return d.getDate() + ' de ' + meses[d.getMonth()] + ' de ' + d.getFullYear();
+  }
+
+  function buildCotizacionPdf() {
+    if (!lastCotizCalc) renderCotizPreview();
+    var calc = lastCotizCalc;
+    var jsPDFCtor = window.jspdf && window.jspdf.jsPDF;
+    if (!jsPDFCtor) throw new Error('No se pudo cargar el generador de PDF (jsPDF) — revisa tu conexión e intenta de nuevo.');
+    var doc = new jsPDFCtor({ unit: 'mm', format: 'letter' });
+    var marginX = 14;
+    var y = 16;
+
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(16);
+    doc.text('COTIZACIÓN', marginX, y);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
+    doc.text('Folio: ' + (cFolio.value.trim() || '(pendiente)'), 150, y - 4);
+    doc.text('Fecha: ' + hoyEnEspanol(), 150, y);
+    y += 6;
+    doc.setDrawColor(153); doc.line(marginX, y, 197, y);
+    y += 7;
+
+    doc.setFontSize(9);
+    var infoLeft = [
+      'Proyecto: ' + (cProyecto.value.trim() || '(completar)'),
+      'Contacto: ' + (cContacto.value.trim() || '(completar)'),
+      'Dirección: ' + (cDireccion.value.trim() || '(completar)')
+    ];
+    var infoRight = [
+      'Tel.: ' + (cTel.value.trim() || '(completar)'),
+      'Asesor: Rodrigo Pardo',
+      'Realizado por: Escáner + motor de cotización automatizado'
+    ];
+    infoLeft.forEach(function (line, i) { doc.text(doc.splitTextToSize(line, 90), marginX, y + i * 5); });
+    infoRight.forEach(function (line, i) { doc.text(doc.splitTextToSize(line, 90), 107, y + i * 5); });
+    y += infoLeft.length * 5 + 6;
+
+    var body = calc.rows.map(function (r, i) {
+      if (r.error) return [i + 1, r.zona.codigo, r.zona.tag, 'sin precio en catálogo', '', '', ''];
+      var d = r.detalle;
+      return [i + 1, r.zona.codigo, r.zona.tag, DESCRIPCION_POR_TIPO[r.zona.tipo] || '', 'LOTE', d.area_m2.toFixed(2) + ' m2', fmtMxn(d.total_venta_mxn)];
+    });
+    doc.autoTable({
+      startY: y,
+      head: [['#', 'Código', 'Zona', 'Descripción', 'Unidad', 'Área', 'Importe']],
+      body: body,
+      styles: { fontSize: 7.5, cellPadding: 1.6, valign: 'top' },
+      headStyles: { fillColor: [47, 93, 80], textColor: 255 },
+      columnStyles: { 0: { cellWidth: 8 }, 1: { cellWidth: 18 }, 3: { cellWidth: 62 }, 5: { cellWidth: 18, halign: 'right' }, 6: { cellWidth: 24, halign: 'right' } },
+      margin: { left: marginX, right: marginX }
+    });
+    y = doc.lastAutoTable.finalY + 8;
+
+    doc.setFontSize(9);
+    doc.text('Subtotal:', 150, y); doc.text(fmtMxn(calc.subtotal), 197, y, { align: 'right' });
+    doc.text('IVA 16%:', 150, y + 5); doc.text(fmtMxn(calc.iva), 197, y + 5, { align: 'right' });
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
+    doc.text('Total:', 150, y + 12); doc.text(fmtMxn(calc.total), 197, y + 12, { align: 'right' });
+    y += 20;
+
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
+    var notas = [
+      'Las áreas de esta cotización provienen de un escaneo 3D y de zonas marcadas manualmente — se recomienda una verificación física en sitio antes de confirmar el pedido.',
+      'Todo pedido debe ser confirmado mediante la firma de este presupuesto y su correspondiente anticipo.',
+      'El presupuesto no incluye flete ni acarreo, salvo especificar lo contrario.',
+      'Los precios de esta cotización están sujetos a cambios sin previo aviso.',
+      'Tipo de cambio usado: $' + calc.tipoCambio + ' MXN por USD — confirmar contra el tipo de cambio del día real antes de enviar al cliente.'
+    ];
+    notas.forEach(function (n, i) {
+      var lines = doc.splitTextToSize('• ' + n, 183);
+      doc.text(lines, marginX, y);
+      y += lines.length * 3.6;
+    });
+
+    return doc;
+  }
+
+  function pdfFileName() {
+    var base = (cProyecto.value.trim() || 'cotizacion').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    return (base || 'cotizacion') + '.pdf';
+  }
+
+  btnCotizCompartir.addEventListener('click', function () {
+    var doc;
+    try { doc = buildCotizacionPdf(); } catch (err) { alert(err.message); return; }
+    var blob = doc.output('blob');
+    var file = new File([blob], pdfFileName(), { type: 'application/pdf' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      navigator.share({ files: [file], title: 'Cotización', text: cProyecto.value.trim() || 'Cotización' }).catch(function () {});
+    } else if (navigator.share) {
+      // algunos navegadores tienen share() pero no soportan archivos -- se
+      // descarga en su lugar para no perder el PDF generado
+      doc.save(pdfFileName());
+      alert('Este navegador no permite compartir archivos directamente — se descargó el PDF, puedes compartirlo desde tu galería/archivos.');
+    } else {
+      doc.save(pdfFileName());
+      alert('Este navegador no soporta compartir directamente — se descargó el PDF.');
+    }
+  });
+
+  btnCotizDescargar.addEventListener('click', function () {
+    var doc;
+    try { doc = buildCotizacionPdf(); } catch (err) { alert(err.message); return; }
+    doc.save(pdfFileName());
   });
 
   // ================= abrir herramienta =================
