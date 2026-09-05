@@ -129,7 +129,7 @@
     <p class="sub">Carga el escaneo de un espacio (exportado como .glb desde Polycam), marca las zonas por material y genera el resumen de áreas para la cotización.</p>
 
     <label class="field">Archivo del escaneo (.glb)</label>
-    <input type="file" id="fileInput" accept=".glb,.gltf,model/gltf-binary">
+    <input type="file" id="fileInput">
     <p id="loadStatus" class="status">Aún no se ha cargado ningún escaneo.</p>
 
     <button id="btnOpenTool" class="btn btn-primary" disabled>Abrir escáner</button>
@@ -432,6 +432,13 @@
     if (err.message) parts.push(err.message);
     if (err.name && err.name !== 'Error') parts.push('(' + err.name + ')');
     if (!parts.length) {
+      // Un Event "pelón" (solo isTrusted, sin message/name) casi siempre es
+      // una descarga/red bloqueada, no un archivo corrupto — pasa sobre
+      // todo cuando la página corre dentro de la vista previa de Claude
+      // (con su propio sandbox), no en la versión publicada en GitHub Pages.
+      if (err.isTrusted !== undefined && !err.message) {
+        return 'la lectura del archivo fue bloqueada por el navegador/entorno (sin más detalle). Si estás probando desde la vista previa de Claude, prueba la versión publicada en GitHub Pages — ahí no debería pasar.';
+      }
       try { parts.push(JSON.stringify(err)); } catch (e) { parts.push(String(err)); }
     }
     return parts.join(' ');
@@ -442,11 +449,11 @@
     if (!file) return;
     loadStatus.textContent = 'Cargando "' + file.name + '"...';
     loadStatus.className = 'status';
-    var url = URL.createObjectURL(file);
     var loader = new THREE.GLTFLoader();
     if (dracoLoader) loader.setDRACOLoader(dracoLoader);
     if (window.MeshoptDecoder) loader.setMeshoptDecoder(MeshoptDecoder);
-    loader.load(url, function (gltf) {
+
+    function onGltf(gltf) {
       try {
         onModelLoaded(gltf.scene);
         loadStatus.textContent = 'Escaneo cargado: ' + file.name + '.';
@@ -457,10 +464,29 @@
         loadStatus.className = 'status err';
         btnOpenTool.disabled = true;
       }
-    }, undefined, function (err) {
+    }
+    function onGltfError(err) {
       loadStatus.textContent = 'No se pudo leer el archivo — ¿seguro que es un .glb exportado de Polycam? ' + describeLoadError(err);
       loadStatus.className = 'status err';
-    });
+    }
+
+    // Leemos el archivo directamente a memoria (FileReader) y se lo pasamos
+    // a GLTFLoader.parse() en vez de loader.load(URL.createObjectURL(file), ...).
+    // La razón: loader.load() hace una descarga (fetch/XHR) de esa URL blob:,
+    // y en algunos entornos con políticas de seguridad estrictas (como la
+    // vista previa de artefactos de Claude) esa descarga se bloquea aunque
+    // el archivo sea válido. Leerlo a memoria y usar parse() evita por
+    // completo ese problema, sin depender de dónde se esté ejecutando la página.
+    var reader = new FileReader();
+    reader.onerror = function () { onGltfError(reader.error); };
+    reader.onload = function () {
+      try {
+        loader.parse(reader.result, '', onGltf, onGltfError);
+      } catch (err) {
+        onGltfError(err);
+      }
+    };
+    reader.readAsArrayBuffer(file);
   });
 
   function onModelLoaded(root) {
