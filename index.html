@@ -176,6 +176,14 @@
     <h1>Escáner + Cotizador</h1>
     <p class="sub">Carga el escaneo de un espacio (exportado como .glb desde Polycam), marca las zonas por material y genera el resumen de áreas para la cotización.</p>
 
+    <div id="iosInstallHint" class="status err" style="margin-bottom:14px; white-space:normal; line-height:1.5;" hidden>
+      <b>Para pantalla completa real en iPhone:</b> Safari no permite que ninguna página oculte su propia barra de direcciones — es una limitación del navegador, no de esta app, y no hay forma de resolverla con código. La única forma real es instalar esta página como un ícono:
+      <br>1. Toca el botón de compartir (el cuadrado con la flecha ↑) en la barra de Safari.
+      <br>2. Elige <b>"Agregar a pantalla de inicio"</b>.
+      <br>3. Cierra Safari y abre la app desde ese ícono nuevo — no desde Safari ni desde un marcador.
+      <br>Abierta así, la barra de direcciones desaparece por completo, incluyendo dentro del visor.
+    </div>
+
     <label class="field">Archivo del escaneo (.glb)</label>
     <input type="file" id="fileInput">
     <p id="loadStatus" class="status">Aún no se ha cargado ningún escaneo.</p>
@@ -322,6 +330,25 @@
   var fileInput = document.getElementById('fileInput');
   var loadStatus = document.getElementById('loadStatus');
   var btnOpenTool = document.getElementById('btnOpenTool');
+  var iosInstallHint = document.getElementById('iosInstallHint');
+
+  // ================= aviso de instalación en iPhone =================
+  // En iOS, Safari NO permite que ninguna página oculte su propia barra de
+  // direcciones con la Fullscreen API (WebKit lo descartó de forma
+  // explícita — bug 212934, cerrado como WONTFIX) — no importa qué tan
+  // bien esté escrito el código, no hay pantalla completa real dentro de
+  // una pestaña normal de Safari. La ÚNICA forma real es que la página se
+  // abra ya instalada como ícono en la pantalla de inicio (modo standalone
+  // de apple-mobile-web-app-capable, ya declarado arriba en el head) —
+  // así que en vez de seguir prometiendo un arreglo por software que no
+  // existe, se detecta el caso y se explica la única solución real.
+  (function checkIosStandalone() {
+    var isIOS = /iP(hone|od|ad)/.test(navigator.platform) ||
+      (navigator.userAgent.includes('Mac') && 'ontouchend' in document); // iPadOS 13+ se anuncia como Mac
+    var isStandalone = window.navigator.standalone === true ||
+      (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+    if (isIOS && !isStandalone) iosInstallHint.hidden = false;
+  })();
 
   var toolEl = document.getElementById('tool');
   var canvas = document.getElementById('canvas');
