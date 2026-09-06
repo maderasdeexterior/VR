@@ -174,7 +174,8 @@
   <div class="card">
     <p class="eyebrow">Escaneo 3D &middot; selección de áreas &middot; cotización</p>
     <h1>Escáner + Cotizador</h1>
-    <p class="sub">Carga el escaneo de un espacio (exportado como .glb desde Polycam), marca las zonas por material y genera el resumen de áreas para la cotización.</p>
+    <p class="sub">Carga el escaneo de un espacio — un .glb exportado desde Polycam, o un .json exportado desde VisorPuenteAR con RoomPlan — marca las zonas por material y genera el resumen de áreas para la cotización.</p>
+    <p class="hint" style="margin-top:-8px;">Con un escaneo RoomPlan (.json) cada muro y piso ya llega como una superficie completa y limpia — un toque selecciona todo el muro de una vez, sin la fragmentación típica de pintar sobre una malla de Polycam. El pincel/goma manual sigue disponible para ajustes finos.</p>
 
     <div id="iosInstallHint" class="status err" style="margin-bottom:14px; white-space:normal; line-height:1.5;" hidden>
       <b>Para pantalla completa real en iPhone:</b> Safari no permite que ninguna página oculte su propia barra de direcciones — es una limitación del navegador, no de esta app, y no hay forma de resolverla con código. La única forma real es instalar esta página como un ícono:
@@ -184,8 +185,8 @@
       <br>Abierta así, la barra de direcciones desaparece por completo, incluyendo dentro del visor.
     </div>
 
-    <label class="field">Archivo del escaneo (.glb)</label>
-    <input type="file" id="fileInput">
+    <label class="field">Archivo del escaneo (.glb de Polycam, o .json de RoomPlan)</label>
+    <input type="file" id="fileInput" accept=".glb,.json">
     <p id="loadStatus" class="status">Aún no se ha cargado ningún escaneo.</p>
 
     <button id="btnOpenTool" class="btn btn-primary" disabled>Abrir escáner</button>
@@ -773,6 +774,36 @@
   fileInput.addEventListener('change', function () {
     var file = fileInput.files && fileInput.files[0];
     if (!file) return;
+
+    // Un escaneo RoomPlan (VisorPuenteAR) llega como .json, no .glb — es
+    // un camino de carga totalmente aparte (no pasa por GLTFLoader ni por
+    // detectPlanes: cada muro/piso ya llega como una superficie limpia,
+    // ver loadRoomPlanJson más abajo), así que se detecta y se atiende
+    // primero, sin tocar nada del flujo de Polycam que sigue después.
+    if (/\.json$/i.test(file.name)) {
+      loadStatus.textContent = 'Cargando "' + file.name + '"...';
+      loadStatus.className = 'status';
+      var jsonReader = new FileReader();
+      jsonReader.onerror = function () {
+        loadStatus.textContent = 'No se pudo leer el archivo — ' + describeLoadError(jsonReader.error);
+        loadStatus.className = 'status err';
+      };
+      jsonReader.onload = function () {
+        try {
+          var surfaceCount = loadRoomPlanJson(jsonReader.result);
+          loadStatus.textContent = 'Escaneo RoomPlan cargado: ' + file.name + ' (' + surfaceCount + ' superficies). Cada muro/piso ya es una superficie completa — un toque selecciona todo, y el pincel sigue disponible para ajustes finos.';
+          loadStatus.className = 'status ok';
+          btnOpenTool.disabled = false;
+        } catch (err) {
+          loadStatus.textContent = 'No se pudo cargar el escaneo RoomPlan — ' + (err && err.message ? err.message : describeLoadError(err));
+          loadStatus.className = 'status err';
+          btnOpenTool.disabled = true;
+        }
+      };
+      jsonReader.readAsText(file);
+      return;
+    }
+
     loadStatus.textContent = 'Cargando "' + file.name + '"...';
     loadStatus.className = 'status';
     var loader = new THREE.GLTFLoader();
@@ -1090,6 +1121,175 @@
       var rgb = PLANE_TINTS[pl.tint];
       pl.gids.forEach(function (g) { triBaseColor.set(g, rgb); });
     });
+  }
+
+  // ================= RoomPlan: importar escaneo nativo =================
+  // Un escaneo RoomPlan (exportado desde VisorPuenteAR, ver "Fase 9" en esa
+  // app) ya entrega cada muro/piso como un rectángulo idealizado — a
+  // diferencia de un .glb de Polycam (una malla ruidosa que hay que agrupar
+  // con detectPlanes() de arriba para poder seleccionar un muro completo),
+  // aquí NO hace falta ningún agrupamiento: cada superficie se registra
+  // directamente como un solo "plano" seleccionable de un toque. Las
+  // aberturas (puertas/ventanas) que ya vienen ubicadas en el archivo se
+  // recortan de la malla — un hueco real, no solo un tono distinto — para
+  // que el área quede neta y lista para cotizar.
+  // Una rejilla más fina recorta las aberturas con más precisión (el área
+  // neta se calcula por celdas completas dentro/fuera de la puerta o
+  // ventana, no con un recorte exacto al milímetro) a cambio de más
+  // triángulos — 0.25m es un buen punto medio para muros/pisos típicos de
+  // una cotización, y el límite de 24 celdas por lado mantiene el conteo
+  // de triángulos trivial para three.js incluso en un cuarto grande.
+  var ROOMPLAN_CELL_TARGET = 0.25; // tamaño de celda deseado, en metros
+  var ROOMPLAN_CELL_MIN = 1, ROOMPLAN_CELL_MAX = 24;
+
+  // Interpola un punto (u,v) dentro del parche definido por las 4 esquinas
+  // de una superficie exportada — vienen en orden (0,0)→(1,0)→(1,1)→(0,1),
+  // así que un simple bilineal reconstruye cualquier punto intermedio sin
+  // depender de que el rectángulo sea perfectamente plano/ortogonal.
+  function roomPlanBilerp(corners, u, v, out) {
+    var p00 = corners[0], p10 = corners[1], p11 = corners[2], p01 = corners[3];
+    var a = (1 - u) * (1 - v), b = u * (1 - v), c = u * v, d = (1 - u) * v;
+    out.set(
+      p00[0] * a + p10[0] * b + p11[0] * c + p01[0] * d,
+      p00[1] * a + p10[1] * b + p11[1] * c + p01[1] * d,
+      p00[2] * a + p10[2] * b + p11[2] * c + p01[2] * d
+    );
+    return out;
+  }
+
+  // "Dentro" de una abertura = el centro de la celda cae en su rectángulo
+  // normalizado — suficiente para una rejilla razonablemente fina, y evita
+  // dejar un hueco "mordido" a la mitad por una sola celda de más.
+  function roomPlanCellInOpening(u0, u1, v0, v1, openings) {
+    var cu = (u0 + u1) / 2, cv = (v0 + v1) / 2;
+    for (var i = 0; i < openings.length; i++) {
+      var o = openings[i];
+      if (cu >= o.uMin && cu <= o.uMax && cv >= o.vMin && cv <= o.vMax) return true;
+    }
+    return false;
+  }
+
+  // Registra una superficie RoomPlan (muro o piso) como un solo plano
+  // seleccionable, con el mismo tipo de datos (paintMeshes/triMeta/grid)
+  // que usa el resto del programa para pintar/medir — así el pincel, la
+  // goma y la cotización funcionan exactamente igual sobre ella. Devuelve
+  // el área neta (ya sin las aberturas) que quedó registrada.
+  function addRoomPlanSurface(surface, tintIdx) {
+    var cols = Math.min(ROOMPLAN_CELL_MAX, Math.max(ROOMPLAN_CELL_MIN, Math.round(surface.width / ROOMPLAN_CELL_TARGET)));
+    var rows = Math.min(ROOMPLAN_CELL_MAX, Math.max(ROOMPLAN_CELL_MIN, Math.round(surface.height / ROOMPLAN_CELL_TARGET)));
+    var openings = surface.openings || [];
+    var tint = PLANE_TINTS[tintIdx % PLANE_TINTS.length];
+
+    var positions = [], colors = [];
+    var pa = new THREE.Vector3(), pb = new THREE.Vector3(), pc = new THREE.Vector3(), pd = new THREE.Vector3();
+    for (var r = 0; r < rows; r++) {
+      var v0 = r / rows, v1 = (r + 1) / rows;
+      for (var col = 0; col < cols; col++) {
+        var u0 = col / cols, u1 = (col + 1) / cols;
+        if (roomPlanCellInOpening(u0, u1, v0, v1, openings)) continue; // hueco real: no se dibuja
+        roomPlanBilerp(surface.corners, u0, v0, pa);
+        roomPlanBilerp(surface.corners, u1, v0, pb);
+        roomPlanBilerp(surface.corners, u1, v1, pc);
+        roomPlanBilerp(surface.corners, u0, v1, pd);
+        [[pa, pb, pc], [pa, pc, pd]].forEach(function (tri) {
+          tri.forEach(function (p) { positions.push(p.x, p.y, p.z); colors.push(tint[0], tint[1], tint[2]); });
+        });
+      }
+    }
+    if (!positions.length) return 0; // la superficie quedó completamente tapada por aberturas
+
+    var geom = new THREE.BufferGeometry();
+    geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geom.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+    // side: DoubleSide por la misma razón que en onModelLoaded — un
+    // rectángulo generado desde un solo lado puede necesitar verse desde
+    // dentro del cuarto. color: 0xb9c4bf para que se vea igual de apagado
+    // que una superficie de Polycam sin textura (ahí también se multiplica
+    // ese tono base contra el tinte de plano).
+    var mat = new THREE.MeshBasicMaterial({ vertexColors: true, color: 0xb9c4bf, side: THREE.DoubleSide });
+    var mesh = new THREE.Mesh(geom, mat);
+    scanRoot.add(mesh);
+
+    var meshIdx = paintMeshes.length;
+    var triGlobalIds = [];
+    paintMeshes.push({ mesh: mesh, colorAttr: geom.attributes.color, triGlobalIds: triGlobalIds });
+    mesh.userData.meshIdx = meshIdx;
+
+    var pos = geom.attributes.position;
+    var triCount = pos.count / 3;
+    var gids = [];
+    var areaAcc = 0;
+    var centroidAcc = new THREE.Vector3();
+    var ta = new THREE.Vector3(), tb = new THREE.Vector3(), tc = new THREE.Vector3();
+    for (var t = 0; t < triCount; t++) {
+      var i0 = t * 3;
+      ta.fromBufferAttribute(pos, i0); tb.fromBufferAttribute(pos, i0 + 1); tc.fromBufferAttribute(pos, i0 + 2);
+      var triArea = new THREE.Triangle(ta, tb, tc).getArea();
+      var cx = (ta.x + tb.x + tc.x) / 3, cy = (ta.y + tb.y + tc.y) / 3, cz = (ta.z + tb.z + tc.z) / 3;
+      var gid = triMeta.length;
+      triMeta.push({ meshIdx: meshIdx, tri: t, area: triArea, cx: cx, cy: cy, cz: cz });
+      triGlobalIds[t] = gid;
+      triBaseColor.set(gid, tint);
+      gids.push(gid);
+      areaAcc += triArea;
+      centroidAcc.addScaledVector(new THREE.Vector3(cx, cy, cz), triArea);
+      var key = cellKey(cx, cy, cz);
+      var arr = grid.get(key);
+      if (!arr) { arr = []; grid.set(key, arr); }
+      arr.push(gid);
+    }
+
+    if (areaAcc > 0) {
+      var origin = centroidAcc.multiplyScalar(1 / areaAcc);
+      // normal a partir de las esquinas ORIGINALES del rectángulo (no de
+      // la rejilla) — más estable si alguna celda quedó recortada por una
+      // abertura justo en una orilla.
+      var p00 = new THREE.Vector3().fromArray(surface.corners[0]);
+      var p10 = new THREE.Vector3().fromArray(surface.corners[1]);
+      var p01 = new THREE.Vector3().fromArray(surface.corners[3]);
+      var normal = new THREE.Vector3().subVectors(p10, p00).cross(new THREE.Vector3().subVectors(p01, p00)).normalize();
+      var planeIdx = planes.length;
+      planes.push({ gids: gids, area: areaAcc, normal: normal, origin: origin, tint: tintIdx % PLANE_TINTS.length });
+      gids.forEach(function (gid) { triPlane.set(gid, planeIdx); });
+    }
+    return areaAcc;
+  }
+
+  // Punto de entrada: recibe el texto del .json exportado por VisorPuenteAR
+  // y reconstruye la escena — mismo reinicio de estado que onModelLoaded()
+  // usa para un .glb nuevo, para que cargar un escaneo RoomPlan encima de
+  // uno anterior (de cualquier tipo) deje todo limpio. Devuelve cuántas
+  // superficies quedaron cargadas (para el mensaje de estado).
+  function loadRoomPlanJson(jsonText) {
+    var data;
+    try { data = JSON.parse(jsonText); }
+    catch (err) { throw new Error('el archivo no es un JSON válido — ¿seguro que es un escaneo exportado desde VisorPuenteAR?'); }
+    if (!data || data.source !== 'RoomPlan' || !Array.isArray(data.walls)) {
+      throw new Error('el archivo no tiene el formato esperado de un escaneo RoomPlan (falta "source":"RoomPlan" o la lista de muros).');
+    }
+
+    while (scanRoot.children.length) scanRoot.remove(scanRoot.children[0]);
+    triMeta = []; triOwner.clear(); grid.clear(); paintMeshes = [];
+    planes = []; triPlane.clear(); triBaseColor.clear();
+    zonas = []; activeZonaId = null; renderZonaList(); updatePillZona();
+
+    var tintIdx = 0, surfaceCount = 0;
+    (data.walls || []).forEach(function (wall) { if (addRoomPlanSurface(wall, tintIdx++) > 0) surfaceCount++; });
+    (data.floors || []).forEach(function (floor) { if (addRoomPlanSurface(floor, tintIdx++) > 0) surfaceCount++; });
+
+    if (!surfaceCount) throw new Error('el escaneo no trajo ningún muro o piso reconocible.');
+
+    // Mismo criterio que onModelLoaded(): un escaneo de interior se
+    // recorre desde ADENTRO, así que la vista arranca al centro del
+    // cuarto, a una altura de ojos típica sobre el piso.
+    var box = new THREE.Box3().setFromObject(scanRoot);
+    var center = box.getCenter(new THREE.Vector3());
+    var eyeY = Math.min(box.min.y + 1.6, box.max.y - 0.1);
+    rig.position.set(center.x, eyeY, center.z);
+    flatYaw = 0; flatPitch = 0;
+    applyFlatLook();
+
+    return surfaceCount;
   }
 
   // ================= pintado =================
