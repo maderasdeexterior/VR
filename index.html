@@ -175,6 +175,15 @@
     <p class="eyebrow">Escaneo 3D &middot; selección de áreas &middot; cotización</p>
     <h1>Escáner + Cotizador</h1>
     <p class="sub">Carga el escaneo de un espacio — un .glb exportado desde Polycam, o un .json exportado desde VisorPuenteAR con RoomPlan — marca las zonas por material y genera el resumen de áreas para la cotización.</p>
+
+    <div style="margin:14px 0 18px; padding:12px 14px; border:1px solid var(--border); border-radius:10px; background:var(--surface-2);">
+      <p class="hint" style="margin:0; color:var(--text);"><b>¿Buscas el botón para escanear con RoomPlan?</b> Esta pantalla solo IMPORTA el resultado — el escaneo en sí se hace en otra app de tu teléfono, <b>VisorPuenteAR</b> (no aquí, en el navegador), porque RoomPlan es una función de iOS que ninguna página web puede usar directamente.</p>
+      <p class="hint" style="margin:8px 0 0;">1. Abre <b>VisorPuenteAR</b> desde el ícono de esa app en tu pantalla de inicio (es una app aparte, no esta página).<br>
+      2. Ahí, toca el ícono con forma de cubo/escuadra que está junto al panel de información (ⓘ), arriba a la derecha — solo aparece cuando NO estás en modo visor.<br>
+      3. Recorre el cuarto hasta terminar y toca "✓ Listo" — se abre el panel para compartir; guarda el archivo o mándalo por AirDrop a esta Mac.<br>
+      4. Regresa aquí y elige ese archivo con <b>"Seleccionar archivo"</b> abajo.</p>
+    </div>
+
     <p class="hint" style="margin-top:-8px;">Con un escaneo RoomPlan (.json) cada muro y piso ya llega como una superficie completa y limpia — un toque selecciona todo el muro de una vez, sin la fragmentación típica de pintar sobre una malla de Polycam. El pincel/goma manual sigue disponible para ajustes finos.</p>
 
     <div id="iosInstallHint" class="status err" style="margin-bottom:14px; white-space:normal; line-height:1.5;" hidden>
@@ -927,8 +936,8 @@
   // arista) y casi-coplanares en "regiones" para poder seleccionar una
   // superficie completa de un solo vistazo, en vez de pintarla a pincel
   // triángulo por triángulo.
-  var PLANE_ANGLE_COS = Math.cos(THREE.MathUtils.degToRad(15)); // tolerancia de ángulo entre normales
-  var PLANE_DIST_THRESH = 0.04; // 4cm de tolerancia sobre el plano ajustado (ruido típico de LiDAR)
+  var PLANE_ANGLE_COS = Math.cos(THREE.MathUtils.degToRad(20)); // tolerancia de ángulo entre normales
+  var PLANE_DIST_THRESH = 0.06; // 6cm de tolerancia sobre el plano ajustado (ruido típico de LiDAR)
   var PLANE_MIN_AREA = 0.25;    // m² — por debajo de esto no vale la pena el "un solo click"
   var PLANE_TINTS = [[0.80, 0.85, 0.83], [0.72, 0.78, 0.76], [0.84, 0.80, 0.74], [0.76, 0.80, 0.86]];
 
@@ -1041,8 +1050,12 @@
     // plano ya ajustado, no un solo paso): si dos regiones caen
     // prácticamente sobre el mismo plano real, las tratamos como una sola
     // superficie seleccionable, aunque no compartan arista directamente.
-    var MERGE_ANGLE_COS = Math.cos(THREE.MathUtils.degToRad(25));
-    var MERGE_DIST_THRESH = 0.12; // 12cm, medido con datos reales de un escaneo con ruido típico
+    var MERGE_ANGLE_COS = Math.cos(THREE.MathUtils.degToRad(30));
+    var MERGE_DIST_THRESH = 0.15; // 15cm — subido junto con la tolerancia de agrupamiento (Fase 10.1):
+    // probado contra dos escaneos reales (1_9_2026.glb, 5_9_2026.glb) con un script aparte que corre
+    // este mismo algoritmo fuera de la app — subir de 25°/12cm a 30°/15cm sube la cobertura de
+    // selección de un toque de 71.8% a 80.7% en el escaneo grande, sin generar ninguna fusión
+    // sospechosa nueva en ninguno de los dos escaneos probados.
 
     var parent = planes.map(function (_, i) { return i; });
     function find(i) { while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; } return i; }
@@ -1169,18 +1182,102 @@
     return false;
   }
 
+  // RoomPlan mide la geometría del cuarto (ancho/alto/posición de cada
+  // muro) pero NO fotografía las superficies — a diferencia de un escaneo
+  // Polycam, que sí toma fotos reales y las pega sobre la malla como
+  // textura. Por eso un muro RoomPlan no tiene ninguna "foto" que copiar;
+  // lo que sí podemos hacer es darle un material generado (ruido sutil +
+  // manchas suaves tipo yeso para los muros, líneas finas tipo loseta
+  // para el piso) para que se vea menos "de plástico" que un color plano,
+  // sin pretender que es una textura real de tu obra. Las texturas se
+  // generan UNA sola vez y se reutilizan en todos los muros/pisos.
+  var ROOMPLAN_TEXTURE_TILE_METERS = 0.6; // tamaño físico de un "azulejo" repetido
+  var roomPlanWallTexture = null, roomPlanFloorTexture = null;
+
+  function roomPlanApplyNoise(ctx, size, amp) {
+    var img = ctx.getImageData(0, 0, size, size);
+    var data = img.data;
+    for (var i = 0; i < data.length; i += 4) {
+      var n = (Math.random() - 0.5) * 2 * amp;
+      data[i] = Math.min(255, Math.max(0, data[i] + n));
+      data[i + 1] = Math.min(255, Math.max(0, data[i + 1] + n));
+      data[i + 2] = Math.min(255, Math.max(0, data[i + 2] + n));
+    }
+    ctx.putImageData(img, 0, 0);
+  }
+
+  function makeRoomPlanWallTexture() {
+    var size = 128;
+    var canvas = document.createElement('canvas');
+    canvas.width = canvas.height = size;
+    var ctx = canvas.getContext('2d');
+    ctx.fillStyle = 'rgb(214,208,196)';
+    ctx.fillRect(0, 0, size, size);
+    roomPlanApplyNoise(ctx, size, 9);
+    // manchas muy translúcidas tipo yeso/estuco, para romper la
+    // uniformidad sin que se note un patrón repetitivo
+    for (var b = 0; b < 6; b++) {
+      var r = size * (0.08 + Math.random() * 0.12);
+      var x = Math.random() * size, y = Math.random() * size;
+      var shade = Math.random() < 0.5 ? 255 : 0;
+      var grad = ctx.createRadialGradient(x, y, 0, x, y, r);
+      grad.addColorStop(0, 'rgba(' + shade + ',' + shade + ',' + shade + ',0.06)');
+      grad.addColorStop(1, 'rgba(' + shade + ',' + shade + ',' + shade + ',0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+    }
+    var tex = new THREE.CanvasTexture(canvas);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(1 / ROOMPLAN_TEXTURE_TILE_METERS, 1 / ROOMPLAN_TEXTURE_TILE_METERS);
+    return tex;
+  }
+
+  function makeRoomPlanFloorTexture() {
+    var size = 128;
+    var canvas = document.createElement('canvas');
+    canvas.width = canvas.height = size;
+    var ctx = canvas.getContext('2d');
+    ctx.fillStyle = 'rgb(196,188,174)';
+    ctx.fillRect(0, 0, size, size);
+    roomPlanApplyNoise(ctx, size, 8);
+    // línea fina de junta, como un azulejo/duela — repetida por
+    // RepeatWrapping, así que basta dibujarla una vez por azulejo
+    ctx.strokeStyle = 'rgba(90,82,68,0.28)';
+    ctx.lineWidth = Math.max(1, size * 0.012);
+    ctx.beginPath();
+    ctx.moveTo(size * 0.5, 0); ctx.lineTo(size * 0.5, size);
+    ctx.moveTo(0, size * 0.5); ctx.lineTo(size, size * 0.5);
+    ctx.stroke();
+    var tex = new THREE.CanvasTexture(canvas);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(1 / ROOMPLAN_TEXTURE_TILE_METERS, 1 / ROOMPLAN_TEXTURE_TILE_METERS);
+    return tex;
+  }
+
+  function getRoomPlanTexture(kind) {
+    if (kind === 'floor') {
+      if (!roomPlanFloorTexture) roomPlanFloorTexture = makeRoomPlanFloorTexture();
+      return roomPlanFloorTexture;
+    }
+    if (!roomPlanWallTexture) roomPlanWallTexture = makeRoomPlanWallTexture();
+    return roomPlanWallTexture;
+  }
+
   // Registra una superficie RoomPlan (muro o piso) como un solo plano
   // seleccionable, con el mismo tipo de datos (paintMeshes/triMeta/grid)
   // que usa el resto del programa para pintar/medir — así el pincel, la
   // goma y la cotización funcionan exactamente igual sobre ella. Devuelve
   // el área neta (ya sin las aberturas) que quedó registrada.
-  function addRoomPlanSurface(surface, tintIdx) {
+  function addRoomPlanSurface(surface, tintIdx, kind) {
     var cols = Math.min(ROOMPLAN_CELL_MAX, Math.max(ROOMPLAN_CELL_MIN, Math.round(surface.width / ROOMPLAN_CELL_TARGET)));
     var rows = Math.min(ROOMPLAN_CELL_MAX, Math.max(ROOMPLAN_CELL_MIN, Math.round(surface.height / ROOMPLAN_CELL_TARGET)));
     var openings = surface.openings || [];
     var tint = PLANE_TINTS[tintIdx % PLANE_TINTS.length];
 
-    var positions = [], colors = [];
+    var positions = [], colors = [], uvs = [];
+    // UVs en metros reales (u*ancho, v*alto) en vez de 0..1 por superficie:
+    // así una sola textura/repeat compartida (getRoomPlanTexture) se ve del
+    // mismo tamaño de "azulejo" sin importar qué tan grande sea cada muro.
     var pa = new THREE.Vector3(), pb = new THREE.Vector3(), pc = new THREE.Vector3(), pd = new THREE.Vector3();
     for (var r = 0; r < rows; r++) {
       var v0 = r / rows, v1 = (r + 1) / rows;
@@ -1191,8 +1288,21 @@
         roomPlanBilerp(surface.corners, u1, v0, pb);
         roomPlanBilerp(surface.corners, u1, v1, pc);
         roomPlanBilerp(surface.corners, u0, v1, pd);
-        [[pa, pb, pc], [pa, pc, pd]].forEach(function (tri) {
-          tri.forEach(function (p) { positions.push(p.x, p.y, p.z); colors.push(tint[0], tint[1], tint[2]); });
+        var pts = [pa, pb, pc, pd];
+        var uvsCorner = [
+          [u0 * surface.width, v0 * surface.height],
+          [u1 * surface.width, v0 * surface.height],
+          [u1 * surface.width, v1 * surface.height],
+          [u0 * surface.width, v1 * surface.height]
+        ];
+        var triIdx = [[0, 1, 2], [0, 2, 3]];
+        triIdx.forEach(function (tri) {
+          tri.forEach(function (idx) {
+            var p = pts[idx], uv = uvsCorner[idx];
+            positions.push(p.x, p.y, p.z);
+            colors.push(tint[0], tint[1], tint[2]);
+            uvs.push(uv[0], uv[1]);
+          });
         });
       }
     }
@@ -1201,12 +1311,14 @@
     var geom = new THREE.BufferGeometry();
     geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
     geom.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+    geom.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
     // side: DoubleSide por la misma razón que en onModelLoaded — un
     // rectángulo generado desde un solo lado puede necesitar verse desde
     // dentro del cuarto. color: 0xb9c4bf para que se vea igual de apagado
     // que una superficie de Polycam sin textura (ahí también se multiplica
-    // ese tono base contra el tinte de plano).
-    var mat = new THREE.MeshBasicMaterial({ vertexColors: true, color: 0xb9c4bf, side: THREE.DoubleSide });
+    // ese tono base contra el tinte de plano). map: la textura procedural
+    // (yeso para muro, loseta para piso) — ver getRoomPlanTexture arriba.
+    var mat = new THREE.MeshBasicMaterial({ vertexColors: true, color: 0xb9c4bf, side: THREE.DoubleSide, map: getRoomPlanTexture(kind) });
     var mesh = new THREE.Mesh(geom, mat);
     scanRoot.add(mesh);
 
@@ -1274,8 +1386,8 @@
     zonas = []; activeZonaId = null; renderZonaList(); updatePillZona();
 
     var tintIdx = 0, surfaceCount = 0;
-    (data.walls || []).forEach(function (wall) { if (addRoomPlanSurface(wall, tintIdx++) > 0) surfaceCount++; });
-    (data.floors || []).forEach(function (floor) { if (addRoomPlanSurface(floor, tintIdx++) > 0) surfaceCount++; });
+    (data.walls || []).forEach(function (wall) { if (addRoomPlanSurface(wall, tintIdx++, 'wall') > 0) surfaceCount++; });
+    (data.floors || []).forEach(function (floor) { if (addRoomPlanSurface(floor, tintIdx++, 'floor') > 0) surfaceCount++; });
 
     if (!surfaceCount) throw new Error('el escaneo no trajo ningún muro o piso reconocible.');
 
