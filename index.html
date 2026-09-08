@@ -122,27 +122,25 @@
   .fab.on { background: var(--danger); color: #fff; }
   .fab.alt { background: #4ab0e0; color: #06211c; }
 
-  /* ---- halo de movimiento (caminar dentro de la escena) ----
-     presentado como "cinturón" pegado a la base de la pantalla (achatado
-     y abajo) en vez de flotar en el centro de la vista, para no taparla
-     mientras se apunta/pinta con la mirada. */
-  .walk-halo {
-    position: fixed; left: 50%; top: calc(100% - 78px - env(safe-area-inset-bottom, 0px));
-    width: 0; height: 0; z-index: 6; pointer-events: none;
+  /* ---- Fase 11: joystick libre de movimiento (caminar dentro de la
+     escena) — reemplaza el halo fijo de 8 botones. El aviso es un texto
+     discreto pegado a la base de la pantalla; el joystick en sí (base +
+     "nub") aparece donde sea que toques mientras el modo esté activo. */
+  .walk-hint {
+    position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
+    z-index: 6; pointer-events: none; background: rgba(0,0,0,0.45); color: #fff;
+    font-size: 12px; padding: 6px 12px; border-radius: 20px; white-space: nowrap;
   }
-  .walk-halo[hidden] { display: none; }
-  .walk-center {
-    position: absolute; left: -16px; top: -16px; width: 32px; height: 32px; border-radius: 50%;
-    background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.3);
-    display: flex; align-items: center; justify-content: center; font-size: 14px; pointer-events: none;
+  .walk-hint[hidden] { display: none; }
+  .joy-base {
+    position: fixed; width: 104px; height: 104px; margin: -52px 0 0 -52px; border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.5); background: rgba(0,0,0,0.25);
+    z-index: 6; pointer-events: none;
   }
-  .walk-btn {
-    position: absolute; width: 38px; height: 38px; margin-left: -19px; margin-top: -19px; border-radius: 50%;
-    background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.35); color: #fff; font-size: 17px;
-    display: flex; align-items: center; justify-content: center; pointer-events: auto; touch-action: none;
-    user-select: none; -webkit-user-select: none;
+  .joy-nub {
+    position: fixed; width: 44px; height: 44px; margin: -22px 0 0 -22px; border-radius: 50%;
+    background: var(--accent); z-index: 6; pointer-events: none;
   }
-  .walk-btn.active { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 
   /* ---- vista de cotización ---- */
   .cotiz-view {
@@ -195,11 +193,12 @@
     </div>
 
     <label class="field">Archivo del escaneo (.glb de Polycam, o .json de RoomPlan)</label>
-    <input type="file" id="fileInput" accept=".glb,.json">
+    <input type="file" id="fileInput" accept=".glb,.json,model/gltf-binary,application/octet-stream,application/json">
     <p id="loadStatus" class="status">Aún no se ha cargado ningún escaneo.</p>
 
     <button id="btnOpenTool" class="btn btn-primary" disabled>Abrir escáner</button>
     <p class="hint">Si tu escaneo se ve fuera de escala o desalineado, no pasa nada — puedes seguir marcando zonas, y luego ajustamos el factor de escala antes de cotizar si hace falta.</p>
+    <p class="hint mono" style="margin-top:14px; opacity:.6; font-size:11px;">Cotizador — <span id="buildTag"></span></p>
   </div>
 </div>
 
@@ -222,17 +221,7 @@
     <button id="fabSheet" class="fab" title="Zonas y materiales">☰</button>
   </div>
 
-  <div id="walkHalo" class="walk-halo" hidden>
-    <div class="walk-center">🧍</div>
-    <button class="walk-btn" data-dir="F"  style="left:0px;   top:-26px;" title="Caminar adelante">↑</button>
-    <button class="walk-btn" data-dir="FR" style="left:50px;  top:-18px;" title="Caminar adelante-derecha">↗</button>
-    <button class="walk-btn" data-dir="R"  style="left:70px;  top:0px;"   title="Caminar a la derecha">→</button>
-    <button class="walk-btn" data-dir="BR" style="left:50px;  top:18px;"  title="Caminar atrás-derecha">↘</button>
-    <button class="walk-btn" data-dir="B"  style="left:0px;   top:26px;"  title="Caminar atrás">↓</button>
-    <button class="walk-btn" data-dir="BL" style="left:-50px; top:18px;"  title="Caminar atrás-izquierda">↙</button>
-    <button class="walk-btn" data-dir="L"  style="left:-70px; top:0px;"   title="Caminar a la izquierda">←</button>
-    <button class="walk-btn" data-dir="FL" style="left:-50px; top:-18px;" title="Caminar adelante-izquierda">↖</button>
-  </div>
+  <div id="walkHint" class="walk-hint" hidden>Toca y arrastra para caminar</div>
 
   <div id="sheet" class="sheet">
     <div class="sheet-handle" id="sheetHandle" style="cursor:pointer;"></div>
@@ -335,6 +324,11 @@
 (function () {
   "use strict";
 
+  // ================= versión (para seguimiento con Rodrigo, no afecta nada funcional) =================
+  var BUILD_VERSION = 'v11 · 08 sep 2026 (joystick libre de movimiento, reemplaza el halo de 8 botones)';
+  var buildTagEl = document.getElementById('buildTag');
+  if (buildTagEl) buildTagEl.textContent = BUILD_VERSION;
+
   // ================= elementos =================
   var setupEl = document.getElementById('setup');
   var fileInput = document.getElementById('fileInput');
@@ -368,7 +362,7 @@
   var fabPlaneMode = document.getElementById('fabPlaneMode');
   var fabVR = document.getElementById('fabVR');
   var fabWalk = document.getElementById('fabWalk');
-  var walkHalo = document.getElementById('walkHalo');
+  var walkHint = document.getElementById('walkHint');
   var btnRecenter = document.getElementById('btnRecenter');
   var btnExitVR = document.getElementById('btnExitVR');
   var pillZonaName = document.getElementById('pillZonaName');
@@ -1588,49 +1582,72 @@
   fabPlaneMode.addEventListener('click', togglePlaneMode);
 
   // ================= modo movimiento (caminar dentro de la escena) =================
-  // Halo fijo al centro de la pantalla con 8 botones direccionales (los 4
-  // cardinales + sus 4 intermedios). El movimiento es relativo a hacia
-  // dónde se está mirando en ese instante (como en un videojuego), no a un
-  // eje fijo del mundo, para que "adelante" siempre sea "hacia donde miro".
+  // Fase 11 — joystick libre: reemplaza el halo fijo de 8 botones. Tocas en
+  // cualquier parte de la pantalla (mientras el modo movimiento está
+  // activo) y arrastras; la distancia respecto al punto donde tocaste
+  // controla la velocidad (0 hasta WALK_SPEED_MPS), y la dirección del
+  // arrastre controla hacia dónde caminas. El movimiento sigue siendo
+  // relativo a hacia dónde se está mirando en ese instante (como antes),
+  // no a un eje fijo del mundo. Evaluado primero con un prototipo aparte
+  // (control_desplazamiento_prototipo.html) antes de instalarlo aquí.
   var walkMode = false;
-  var activeWalkDir = null;
-  var WALK_SPEED_MPS = 1.4; // paso caminando normal
-
-  function setWalkActiveBtn(dirKey) {
-    var btns = walkHalo.querySelectorAll('.walk-btn');
-    for (var i = 0; i < btns.length; i++) {
-      btns[i].classList.toggle('active', dirKey !== null && btns[i].getAttribute('data-dir') === dirKey);
-    }
-  }
+  var WALK_SPEED_MPS = 1.4; // misma velocidad tope que el halo anterior — el joystick solo agrega grados intermedios por debajo de ese tope, no un tope nuevo
+  var JOY_MAXR = 52; // radio en px hasta el que el arrastre sigue creciendo la velocidad
+  var joyVec = new THREE.Vector2(0, 0);   // dirección unitaria * (0..1) de intensidad, en espacio de pantalla (x=derecha, y=adelante)
+  var joySpeedFrac = 0;                   // 0..1
+  var joyActive = false, joyOrigin = null, joyBaseEl = null, joyNubEl = null;
 
   function toggleWalkMode() {
     walkMode = !walkMode;
     fabWalk.classList.toggle('on', walkMode);
-    walkHalo.hidden = !walkMode;
-    // El halo vive pegado a la base de la pantalla — si la hoja de zonas
-    // sigue abierta, la tapa (y de paso, con la hoja abierta la atención
-    // del usuario está en el menú, no en caminar). Se cierra sola al
-    // activar el modo movimiento, igual que ya pasa al entrar a VR.
+    // El aviso "toca y arrastra para caminar" solo tiene sentido mientras el
+    // modo está activo — igual que antes con el halo, si la hoja de zonas
+    // sigue abierta se cierra sola al activar el modo movimiento, para que
+    // la atención (y el toque) esté en caminar, no en el menú.
+    walkHint.hidden = !walkMode;
     if (walkMode) sheet.hidden = true;
-    activeWalkDir = null;
-    setWalkActiveBtn(null);
+    joyEnd();
     resetDwell();
   }
   fabWalk.addEventListener('click', toggleWalkMode);
 
-  Array.prototype.forEach.call(walkHalo.querySelectorAll('.walk-btn'), function (btn) {
-    var dir = btn.getAttribute('data-dir');
-    function start(ev) { if (ev.cancelable) ev.preventDefault(); activeWalkDir = dir; setWalkActiveBtn(dir); }
-    function stop() { if (activeWalkDir === dir) { activeWalkDir = null; setWalkActiveBtn(null); } }
-    btn.addEventListener('pointerdown', start);
-    btn.addEventListener('pointerenter', start);
-    btn.addEventListener('pointerup', stop);
-    btn.addEventListener('pointerleave', stop);
-    btn.addEventListener('pointercancel', stop);
-  });
+  function joyStart(ev) {
+    if (!walkMode) return;
+    if (ev.cancelable) ev.preventDefault();
+    joyActive = true;
+    joyOrigin = { x: ev.clientX, y: ev.clientY };
+    joyBaseEl = document.createElement('div'); joyBaseEl.className = 'joy-base';
+    joyBaseEl.style.left = ev.clientX + 'px'; joyBaseEl.style.top = ev.clientY + 'px';
+    joyNubEl = document.createElement('div'); joyNubEl.className = 'joy-nub';
+    joyNubEl.style.left = ev.clientX + 'px'; joyNubEl.style.top = ev.clientY + 'px';
+    // Se agregan dentro de #tool, NO de document.body: la pantalla completa
+    // entra en el "top layer" del elemento #tool, así que cualquier cosa
+    // fuera de su árbol (como el body directamente) deja de pintarse en
+    // pantalla mientras el modo pantalla completa está activo — encontrado
+    // durante pruebas antes de instalar esto.
+    toolEl.appendChild(joyBaseEl); toolEl.appendChild(joyNubEl);
+  }
+  function joyMove(ev) {
+    if (!joyActive) return;
+    var dx = ev.clientX - joyOrigin.x, dy = ev.clientY - joyOrigin.y;
+    var len = Math.hypot(dx, dy);
+    var clamped = Math.min(len, JOY_MAXR);
+    var nx = len > 0.001 ? dx / len : 0, ny = len > 0.001 ? dy / len : 0;
+    joyNubEl.style.left = (joyOrigin.x + nx * clamped) + 'px';
+    joyNubEl.style.top = (joyOrigin.y + ny * clamped) + 'px';
+    joySpeedFrac = clamped / JOY_MAXR;
+    // dy negativo (arrastre hacia arriba de la pantalla) = avanzar
+    joyVec.set(nx * joySpeedFrac, -ny * joySpeedFrac);
+  }
+  function joyEnd() {
+    joyActive = false; joyOrigin = null;
+    joyVec.set(0, 0); joySpeedFrac = 0;
+    if (joyBaseEl) { joyBaseEl.remove(); joyBaseEl = null; }
+    if (joyNubEl) { joyNubEl.remove(); joyNubEl = null; }
+  }
 
   function updateWalk(dt) {
-    if (!activeWalkDir) return;
+    if (!walkMode || joyVec.lengthSq() < 1e-6) return;
     var camDir = new THREE.Vector3(0, 0, -1).applyQuaternion(rig.quaternion);
     camDir.y = 0;
     if (camDir.lengthSq() < 1e-6) camDir.set(0, 0, -1); else camDir.normalize();
@@ -1639,12 +1656,10 @@
     if (camRight.lengthSq() < 1e-6) camRight.set(1, 0, 0); else camRight.normalize();
 
     var move = new THREE.Vector3();
-    if (activeWalkDir.indexOf('F') !== -1) move.add(camDir);
-    if (activeWalkDir.indexOf('B') !== -1) move.sub(camDir);
-    if (activeWalkDir.indexOf('R') !== -1) move.add(camRight);
-    if (activeWalkDir.indexOf('L') !== -1) move.sub(camRight);
+    move.addScaledVector(camDir, joyVec.y);
+    move.addScaledVector(camRight, joyVec.x);
     if (move.lengthSq() < 1e-6) return;
-    move.normalize().multiplyScalar(WALK_SPEED_MPS * dt / 1000);
+    move.normalize().multiplyScalar(WALK_SPEED_MPS * joySpeedFrac * dt / 1000);
     rig.position.x += move.x;
     rig.position.z += move.z;
   }
@@ -1928,10 +1943,15 @@
 
     var dragging = false, lastX = 0, lastY = 0, moved = false;
     canvas.addEventListener('pointerdown', function (ev) {
+      // Con el modo movimiento activo, tocar la pantalla es el joystick de
+      // caminar (Fase 11) — no mirar alrededor; los dos gestos usan el
+      // mismo dedo/toque, así que no pueden convivir al mismo tiempo.
+      if (walkMode) { joyStart(ev); return; }
       if (mode !== 'flat') return;
       dragging = true; moved = false; lastX = ev.clientX; lastY = ev.clientY;
     });
     canvas.addEventListener('pointermove', function (ev) {
+      if (walkMode) { joyMove(ev); return; }
       if (mode !== 'flat' || !dragging) return;
       var dx = ev.clientX - lastX, dy = ev.clientY - lastY;
       lastX = ev.clientX; lastY = ev.clientY;
@@ -1941,7 +1961,8 @@
       flatPitch = Math.max(-1.5, Math.min(1.5, flatPitch));
       applyFlatLook();
     });
-    window.addEventListener('pointerup', function () { dragging = false; });
+    window.addEventListener('pointerup', function () { dragging = false; if (walkMode) joyEnd(); });
+    window.addEventListener('pointercancel', function () { dragging = false; if (walkMode) joyEnd(); });
   }
 
   function resize() {
