@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Enviar ticket</title>
+
+<!-- ícono / instalable en pantalla de inicio -->
+<link id="favicon" rel="icon" href="">
+<link id="appleicon" rel="apple-touch-icon" href="">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Enviar ticket">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#1C1B19">
+<link id="manifestlink" rel="manifest" href="">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
+<style>
+  /* ======================================================
+     TOKENS DE DISEÑO
+  ====================================================== */
+  :root{
+    --bg:        #1C1B19;
+    --panel:     #26241D;
+    --panel-2:   #302D24;
+    --line:      #4A4740;
+    --text:      #F5F2EA;
+    --text-dim:  #ABA69B;
+    --yellow:    #F2B705;
+    --yellow-ink:#1C1B19;
+    --green:     #3D8361;
+    --rust:      #C1440E;
+    --radius:    6px;
+  }
+
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+
+  html,body{
+    margin:0; padding:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  }
+
+  body{
+    padding-bottom:110px; /* espacio para la barra fija de envío */
+  }
+
+  h1,h2,.headline{
+    font-family:'Big Shoulders Display','Inter',sans-serif;
+    font-weight:800;
+    letter-spacing:0.01em;
+    margin:0;
+  }
+
+  .wrap{
+    max-width:520px;
+    margin:0 auto;
+    padding:0 16px;
+  }
+
+  /* ---------- header ---------- */
+  header{
+    background:var(--panel);
+    border-bottom:3px solid var(--yellow);
+    padding:22px 16px 18px;
+  }
+  header .wrap{ padding:0 4px; }
+  header h1{
+    font-size:30px;
+    color:var(--yellow);
+    text-transform:uppercase;
+  }
+  header p{
+    margin:6px 0 0;
+    color:var(--text-dim);
+    font-size:14px;
+    line-height:1.4;
+  }
+
+  /* ---------- secciones ---------- */
+  section.step{
+    padding:22px 0;
+    border-bottom:1px solid var(--line);
+  }
+  section.step:last-of-type{ border-bottom:none; }
+
+  .step-head{
+    display:flex;
+    align-items:baseline;
+    gap:10px;
+    margin-bottom:12px;
+  }
+  .step-num{
+    font-family:'Big Shoulders Display',sans-serif;
+    font-weight:800;
+    font-size:26px;
+    color:var(--yellow);
+    min-width:28px;
+  }
+  .step-title{
+    font-size:19px;
+    font-weight:700;
+  }
+  .step-sub{
+    margin:0 0 0 38px;
+    color:var(--text-dim);
+    font-size:13px;
+  }
+
+  /* ---------- grids de botones grandes ---------- */
+  .choice-grid{
+    display:grid;
+    grid-template-columns:1fr;
+    gap:10px;
+    margin-top:12px;
+  }
+  .choice-grid.two-col{ grid-template-columns:1fr 1fr; }
+
+  .choice-btn{
+    appearance:none;
+    border:2px solid var(--line);
+    background:var(--panel-2);
+    color:var(--text);
+    border-radius:var(--radius);
+    padding:16px 14px;
+    font-size:16px;
+    font-weight:600;
+    font-family:inherit;
+    text-align:left;
+    min-height:56px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    cursor:pointer;
+    transition:border-color .12s, background .12s;
+  }
+  .choice-btn:active{ background:var(--panel); }
+  .choice-btn .tick{
+    opacity:0;
+    font-weight:900;
+    color:var(--yellow-ink);
+  }
+  .choice-btn.selected{
+    border-color:var(--yellow);
+    background:var(--yellow);
+    color:var(--yellow-ink);
+  }
+  .choice-btn.selected .tick{ opacity:1; }
+
+  /* ---------- inputs opcionales ---------- */
+  .field{
+    margin-top:12px;
+  }
+  .field label{
+    display:block;
+    font-size:13px;
+    color:var(--text-dim);
+    margin-bottom:6px;
+  }
+  .field input, .field textarea{
+    width:100%;
+    background:var(--panel-2);
+    border:2px solid var(--line);
+    border-radius:var(--radius);
+    color:var(--text);
+    font-size:16px;
+    font-family:inherit;
+    padding:14px;
+  }
+  .field input:focus, .field textarea:focus{
+    outline:none;
+    border-color:var(--yellow);
+  }
+
+  /* ---------- consejos de foto ---------- */
+  .tips{
+    background:var(--panel-2);
+    border:2px dashed var(--line);
+    border-radius:var(--radius);
+    padding:14px 16px;
+    margin:14px 0 4px;
+  }
+  .tips p{
+    margin:0 0 8px;
+    font-size:13px;
+    color:var(--text-dim);
+    text-transform:uppercase;
+    letter-spacing:.03em;
+  }
+  .tips ul{
+    margin:0; padding-left:18px;
+  }
+  .tips li{
+    font-size:14px;
+    line-height:1.6;
+  }
+
+  /* ---------- foto ---------- */
+  .photo-actions{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+    margin-top:14px;
+  }
+  .photo-btn{
+    border:2px solid var(--yellow);
+    background:transparent;
+    color:var(--yellow);
+    border-radius:var(--radius);
+    padding:16px 10px;
+    font-size:15px;
+    font-weight:700;
+    font-family:inherit;
+    min-height:56px;
+    cursor:pointer;
+  }
+  .photo-btn:active{ background:rgba(242,183,5,.12); }
+
+  .preview{
+    margin-top:14px;
+    display:none;
+  }
+  .preview.show{ display:block; }
+  .preview img{
+    width:100%;
+    border-radius:var(--radius);
+    border:2px solid var(--green);
+    display:block;
+  }
+  .preview .ok-line{
+    margin-top:8px;
+    font-size:13px;
+    color:var(--green);
+    font-weight:700;
+  }
+
+  /* ---------- resumen del asunto ---------- */
+  .subject-preview{
+    margin-top:16px;
+    background:var(--panel-2);
+    border-left:3px solid var(--yellow);
+    padding:10px 12px;
+    font-size:12.5px;
+    color:var(--text-dim);
+    font-family:'SFMono-Regular',Consolas,monospace;
+    line-height:1.5;
+    word-break:break-word;
+  }
+
+  /* ---------- barra fija ---------- */
+  .send-bar{
+    position:fixed;
+    left:0; right:0; bottom:0;
+    background:var(--bg);
+    border-top:3px solid var(--yellow);
+    padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));
+  }
+  .send-bar .wrap{ padding:0; }
+  #enviarBtn{
+    width:100%;
+    border:none;
+    border-radius:var(--radius);
+    padding:18px;
+    font-size:18px;
+    font-family:'Big Shoulders Display',sans-serif;
+    font-weight:800;
+    letter-spacing:.02em;
+    text-transform:uppercase;
+    cursor:pointer;
+    background:var(--line);
+    color:var(--text-dim);
+  }
+  #enviarBtn.ready{
+    background:var(--yellow);
+    color:var(--yellow-ink);
+  }
+  #enviarBtn:active.ready{ background:#d9a504; }
+  .missing-hint{
+    text-align:center;
+    font-size:12px;
+    color:var(--text-dim);
+    margin-top:6px;
+    min-height:14px;
+  }
+
+  /* ---------- plan B manual ---------- */
+  .planb{
+    text-align:center;
+    margin-top:10px;
+  }
+  .planb button{
+    background:none;
+    border:none;
+    color:var(--text-dim);
+    font-size:12px;
+    text-decoration:underline;
+    font-family:inherit;
+    cursor:pointer;
+  }
+
+  /* ---------- estado enviado ---------- */
+  .toast{
+    position:fixed;
+    left:16px; right:16px; bottom:100px;
+    background:var(--green);
+    color:#fff;
+    padding:12px 14px;
+    border-radius:var(--radius);
+    font-size:14px;
+    font-weight:600;
+    text-align:center;
+    display:none;
+    z-index:20;
+  }
+  .toast.show{ display:block; }
+
+  input[type=file]{ display:none; }
+
+  @media (min-width:600px){
+    .choice-grid{ grid-template-columns:1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <h1>Enviar ticket</h1>
+    <p>Selecciona obra y categoría, toma la foto del ticket y se abre el correo listo para enviar. Menos de 30 segundos.</p>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- PASO 1 · OBRA -->
+  <section class="step">
+    <div class="step-head">
+      <span class="step-num">1</span>
+      <span class="step-title">Obra</span>
+    </div>
+    <div id="obraGrid" class="choice-grid"></div>
+  </section>
+
+  <!-- PASO 2 · CATEGORÍA -->
+  <section class="step">
+    <div class="step-head">
+      <span class="step-num">2</span>
+      <span class="step-title">Categoría de gasto</span>
+    </div>
+    <div id="categoriaGrid" class="choice-grid two-col"></div>
+  </section>
+
+  <!-- PASO 3 · FORMA DE PAGO -->
+  <section class="step">
+    <div class="step-head">
+      <span class="step-num">3</span>
+      <span class="step-title">Forma de pago</span>
+    </div>
+    <div id="formaPagoGrid" class="choice-grid two-col"></div>
+  </section>
+
+  <!-- PASO 4 · MONTO Y NOTA (opcionales) -->
+  <section class="step">
+    <div class="step-head">
+      <span class="step-num">4</span>
+      <span class="step-title">Monto y nota</span>
+    </div>
+    <p class="step-sub">Opcionales — solo si los quieres anotar aquí.</p>
+
+    <div class="field">
+      <label for="montoInput">Monto (MXN)</label>
+      <input id="montoInput" type="number" inputmode="decimal" min="0" step="0.01" placeholder="Ej. 450.00">
+    </div>
+
+    <div class="field">
+      <label for="notaInput">Nota</label>
+      <input id="notaInput" type="text" maxlength="80" placeholder="Ej. Tornillos para cimbra">
+    </div>
+  </section>
+
+  <!-- PASO 5 · FOTO -->
+  <section class="step">
+    <div class="step-head">
+      <span class="step-num">5</span>
+      <span class="step-title">Foto del ticket</span>
+    </div>
+
+    <div class="tips">
+      <p>Antes de tomar la foto</p>
+      <ul>
+        <li>Busca buena luz — evita sombras encima del papel.</li>
+        <li>Coloca el ticket plano sobre una superficie firme.</li>
+        <li>Que se vea completo, sin dobleces ni recortes.</li>
+        <li>Acércate para que el texto se lea, sin usar zoom digital.</li>
+      </ul>
+    </div>
+
+    <div class="photo-actions">
+      <button type="button" class="photo-btn" id="btnCamara">📷 Tomar foto</button>
+      <button type="button" class="photo-btn" id="btnGaleria">🖼️ Elegir de galería</button>
+    </div>
+    <input type="file" id="inputCamara" accept="image/*" capture="environment">
+    <input type="file" id="inputGaleria" accept="image/*">
+
+    <div class="preview" id="previewBox">
+      <img id="previewImg" alt="Vista previa del ticket">
+      <div class="ok-line">✓ Foto lista</div>
+    </div>
+  </section>
+
+  <div class="subject-preview" id="subjectPreview">
+    Asunto: —
+  </div>
+
+</main>
+
+<div class="toast" id="toast"></div>
+
+<div class="send-bar">
+  <div class="wrap">
+    <button id="enviarBtn" disabled>Enviar por correo</button>
+    <div class="missing-hint" id="missingHint"></div>
+    <div class="planb">
+      <button type="button" id="planBBtn">¿No se abrió el correo? Descargar foto y abrir correo manualmente</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   BLOQUE DE CONFIGURACIÓN — edita aquí, no más abajo
+   ============================================================ */
+const CONFIG = {
+  EMAIL_DESTINO: "rodrigo@maderasdeexterior.com",
+
+  OBRAS: [
+    "San Bernardo",
+    "Mantenimiento Abastos",
+    "Punta Loma"
+  ],
+
+  CATEGORIAS: [
+    "Materiales",
+    "Mano de obra",
+    "Transporte",
+    "Combustible",
+    "Comida",
+    "Herramientas",
+    "Otro"
+  ],
+
+  FORMAS_PAGO: [
+    "Efectivo",
+    "Transferencia",
+    "Tarjeta"
+  ]
+};
+/* ============================================================ */
+
+const state = {
+  obra: null,
+  categoria: null,
+  formaPago: null,
+  monto: "",
+  nota: "",
+  photoFile: null,
+  photoUrl: null
+};
+
+/* ---------- construir grids de botones ---------- */
+function buildChoiceGrid(containerId, options, stateKey){
+  const el = document.getElementById(containerId);
+  el.innerHTML = "";
+  options.forEach(opt => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "choice-btn";
+    btn.innerHTML = `<span>${opt}</span><span class="tick">✓</span>`;
+    btn.addEventListener("click", () => {
+      state[stateKey] = opt;
+      [...el.children].forEach(c => c.classList.remove("selected"));
+      btn.classList.add("selected");
+      refresh();
+    });
+    el.appendChild(btn);
+  });
+}
+
+buildChoiceGrid("obraGrid", CONFIG.OBRAS, "obra");
+buildChoiceGrid("categoriaGrid", CONFIG.CATEGORIAS, "categoria");
+buildChoiceGrid("formaPagoGrid", CONFIG.FORMAS_PAGO, "formaPago");
+
+/* ---------- monto / nota ---------- */
+document.getElementById("montoInput").addEventListener("input", e => {
+  state.monto = e.target.value.trim();
+  refresh();
+});
+document.getElementById("notaInput").addEventListener("input", e => {
+  state.nota = e.target.value.trim();
+  refresh();
+});
+
+/* ---------- foto ---------- */
+const inputCamara = document.getElementById("inputCamara");
+const inputGaleria = document.getElementById("inputGaleria");
+
+document.getElementById("btnCamara").addEventListener("click", () => inputCamara.click());
+document.getElementById("btnGaleria").addEventListener("click", () => inputGaleria.click());
+
+[inputCamara, inputGaleria].forEach(inp => {
+  inp.addEventListener("change", () => {
+    const file = inp.files && inp.files[0];
+    if (!file) return;
+    if (state.photoUrl) URL.revokeObjectURL(state.photoUrl);
+    state.photoFile = file;
+    state.photoUrl = URL.createObjectURL(file);
+    document.getElementById("previewImg").src = state.photoUrl;
+    document.getElementById("previewBox").classList.add("show");
+    refresh();
+  });
+});
+
+/* ---------- asunto ---------- */
+function buildSubject(){
+  const parts = [state.obra, state.categoria, state.formaPago].filter(Boolean);
+  if (state.monto) parts.push(`$${state.monto} MXN`);
+  if (state.nota) parts.push(state.nota);
+  return parts.join(" | ");
+}
+
+/* ---------- refrescar estado de la UI ---------- */
+function refresh(){
+  const subject = buildSubject();
+  document.getElementById("subjectPreview").textContent =
+    (state.obra || state.categoria || state.formaPago) ? `Asunto: ${subject}` : "Asunto: —";
+
+  const missing = [];
+  if (!state.obra) missing.push("obra");
+  if (!state.categoria) missing.push("categoría");
+  if (!state.formaPago) missing.push("forma de pago");
+  if (!state.photoFile) missing.push("foto");
+
+  const btn = document.getElementById("enviarBtn");
+  const hint = document.getElementById("missingHint");
+  if (missing.length === 0){
+    btn.disabled = false;
+    btn.classList.add("ready");
+    hint.textContent = "";
+  } else {
+    btn.disabled = true;
+    btn.classList.remove("ready");
+    hint.textContent = "Falta: " + missing.join(", ");
+  }
+}
+refresh();
+
+/* ---------- envío ---------- */
+document.getElementById("enviarBtn").addEventListener("click", async () => {
+  await intentarEnvio();
+});
+document.getElementById("planBBtn").addEventListener("click", () => {
+  planB();
+});
+
+async function intentarEnvio(){
+  if (!state.photoFile) return;
+  const subject = buildSubject();
+  const shareData = {
+    files: [state.photoFile],
+    title: subject,
+    text: subject
+  };
+
+  try{
+    if (navigator.canShare && navigator.canShare({ files: shareData.files })){
+      await navigator.share(shareData);
+      showToast("Se abrió el menú para compartir. Elige tu app de correo.");
+      return;
+    }
+  } catch (err){
+    if (err && err.name === "AbortError") return; // el usuario canceló, no es error
+    // si falla, cae al plan B
+  }
+  planB();
+}
+
+function planB(){
+  if (!state.photoFile){
+    showToast("Primero toma o elige la foto del ticket.");
+    return;
+  }
+  const subject = buildSubject();
+
+  // 1) descargar la foto
+  const a = document.createElement("a");
+  a.href = state.photoUrl;
+  a.download = "ticket-" + Date.now() + ".jpg";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+
+  // 2) abrir correo prellenado (sin adjunto automático — hay que adjuntarlo a mano)
+  const body = "Adjunta aquí la foto del ticket que se acaba de descargar a tu galería.";
+  const mailto = `mailto:${CONFIG.EMAIL_DESTINO}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+  setTimeout(() => {
+    window.location.href = mailto;
+  }, 400);
+
+  showToast("Foto descargada. Se abre tu correo — adjunta la foto antes de enviar.");
+}
+
+function showToast(msg){
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(showToast._timer);
+  showToast._timer = setTimeout(() => t.classList.remove("show"), 4500);
+}
+
+/* ============================================================
+   Ícono + manifest (instalable en pantalla de inicio),
+   generado en tiempo de ejecución para mantener un solo archivo.
+   ============================================================ */
+(function setupInstallable(){
+  const iconSvg = `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
+      <rect width="192" height="192" fill="#1C1B19"/>
+      <rect x="46" y="28" width="100" height="136" rx="6" fill="#26241D" stroke="#F2B705" stroke-width="6"/>
+      <line x1="62" y1="58" x2="130" y2="58" stroke="#F2B705" stroke-width="7" stroke-linecap="round"/>
+      <line x1="62" y1="82" x2="130" y2="82" stroke="#F5F2EA" stroke-width="7" stroke-linecap="round"/>
+      <line x1="62" y1="106" x2="112" y2="106" stroke="#F5F2EA" stroke-width="7" stroke-linecap="round"/>
+      <line x1="62" y1="134" x2="120" y2="134" stroke="#3D8361" stroke-width="9" stroke-linecap="round"/>
+    </svg>`;
+  const iconDataUrl = "data:image/svg+xml;base64," + btoa(iconSvg);
+
+  document.getElementById("favicon").href = iconDataUrl;
+  document.getElementById("appleicon").href = iconDataUrl;
+
+  const manifest = {
+    name: "Enviar ticket",
+    short_name: "Ticket",
+    start_url: ".",
+    display: "standalone",
+    background_color: "#1C1B19",
+    theme_color: "#1C1B19",
+    icons: [{ src: iconDataUrl, sizes: "192x192", type: "image/svg+xml" }]
+  };
+  const manifestBlob = new Blob([JSON.stringify(manifest)], { type: "application/manifest+json" });
+  document.getElementById("manifestlink").href = URL.createObjectURL(manifestBlob);
+})();
+</script>
+</body>
+</html>
