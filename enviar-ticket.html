@@ -350,6 +350,13 @@
 
   input[type=file]{ display:none; }
 
+  .tarjeta-box{
+    display:none;
+  }
+  .tarjeta-box.show{
+    display:block;
+  }
+
   @media (min-width:600px){
     .choice-grid{ grid-template-columns:1fr 1fr; }
   }
@@ -404,6 +411,11 @@
       <span class="step-title">Forma de pago</span>
     </div>
     <div id="formaPagoGrid" class="choice-grid two-col"></div>
+
+    <div class="tarjeta-box" id="tarjetaBox">
+      <p class="step-sub" style="margin:14px 0 0 0;">¿Qué tarjeta?</p>
+      <div id="tarjetaGrid" class="choice-grid two-col"></div>
+    </div>
   </section>
 
   <!-- PASO 5 · MONTO Y NOTA (opcionales) -->
@@ -507,6 +519,16 @@ const CONFIG = {
     "Efectivo",
     "Transferencia",
     "Tarjeta"
+  ],
+
+  // solo se piden cuando la forma de pago es "Tarjeta" — sujeto a modificación posterior
+  TARJETAS: [
+    "Joy",
+    "Invex Ro",
+    "Invex Ixchel",
+    "Clásica",
+    "Plata",
+    "Nu"
   ]
 };
 /* ============================================================ */
@@ -516,6 +538,7 @@ const state = {
   obra: null,
   categoria: null,
   formaPago: null,
+  tarjeta: null,
   monto: "",
   nota: "",
   photoFile: null,
@@ -523,7 +546,7 @@ const state = {
 };
 
 /* ---------- construir grids de botones ---------- */
-function buildChoiceGrid(containerId, options, stateKey){
+function buildChoiceGrid(containerId, options, stateKey, onSelect){
   const el = document.getElementById(containerId);
   el.innerHTML = "";
   options.forEach(opt => {
@@ -536,6 +559,7 @@ function buildChoiceGrid(containerId, options, stateKey){
       [...el.children].forEach(c => c.classList.remove("selected"));
       btn.classList.add("selected");
       refresh();
+      if (onSelect) onSelect(opt);
     });
     el.appendChild(btn);
   });
@@ -543,7 +567,22 @@ function buildChoiceGrid(containerId, options, stateKey){
 
 buildChoiceGrid("obraGrid", CONFIG.OBRAS, "obra");
 buildChoiceGrid("categoriaGrid", CONFIG.CATEGORIAS, "categoria");
-buildChoiceGrid("formaPagoGrid", CONFIG.FORMAS_PAGO, "formaPago");
+buildChoiceGrid("formaPagoGrid", CONFIG.FORMAS_PAGO, "formaPago", (valor) => {
+  toggleTarjetaBox(valor === "Tarjeta");
+});
+buildChoiceGrid("tarjetaGrid", CONFIG.TARJETAS, "tarjeta");
+
+function toggleTarjetaBox(mostrar){
+  const box = document.getElementById("tarjetaBox");
+  if (mostrar){
+    box.classList.add("show");
+  } else {
+    box.classList.remove("show");
+    state.tarjeta = null;
+    document.querySelectorAll("#tarjetaGrid .choice-btn.selected").forEach(b => b.classList.remove("selected"));
+  }
+  refresh();
+}
 
 /* ---------- código ---------- */
 document.getElementById("codigoInput").addEventListener("input", e => {
@@ -600,6 +639,7 @@ function refresh(){
   if (!state.obra) missing.push("obra");
   if (!state.categoria) missing.push("categoría");
   if (!state.formaPago) missing.push("forma de pago");
+  if (state.formaPago === "Tarjeta" && !state.tarjeta) missing.push("tarjeta");
   if (!state.photoFile) missing.push("foto");
 
   const btn = document.getElementById("enviarBtn");
@@ -692,7 +732,8 @@ function setSending(isSending){
 }
 
 async function enviarTicket(){
-  if (!state.codigo || !state.obra || !state.categoria || !state.formaPago || !state.photoFile) return;
+  const faltaTarjeta = state.formaPago === "Tarjeta" && !state.tarjeta;
+  if (!state.codigo || !state.obra || !state.categoria || !state.formaPago || faltaTarjeta || !state.photoFile) return;
 
   if (!CONFIG.APPS_SCRIPT_URL || CONFIG.APPS_SCRIPT_URL.startsWith("PEGA_AQUI")){
     showToast("Falta configurar la URL del Apps Script en CONFIG.");
@@ -708,6 +749,7 @@ async function enviarTicket(){
       obra: state.obra,
       categoria: state.categoria,
       formaPago: state.formaPago,
+      tarjeta: state.formaPago === "Tarjeta" ? state.tarjeta : "",
       monto: state.monto,
       nota: state.nota,
       filename: state.photoFile.name || "ticket.jpg",
@@ -765,6 +807,7 @@ function resetFormDespuesDeEnvio(){
   state.obra = null;
   state.categoria = null;
   state.formaPago = null;
+  state.tarjeta = null;
   state.monto = "";
   state.nota = "";
   state.photoFile = null;
@@ -772,6 +815,7 @@ function resetFormDespuesDeEnvio(){
   state.photoUrl = null;
 
   document.querySelectorAll(".choice-btn.selected").forEach(b => b.classList.remove("selected"));
+  document.getElementById("tarjetaBox").classList.remove("show");
   document.getElementById("montoInput").value = "";
   document.getElementById("notaInput").value = "";
   document.getElementById("previewBox").classList.remove("show");
