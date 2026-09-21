@@ -319,6 +319,35 @@
   }
   .toast.show{ display:block; }
 
+  .pending-bar{
+    display:none;
+    position:fixed;
+    left:16px; right:16px; bottom:100px;
+    background:var(--panel-2);
+    border:2px solid var(--rust);
+    border-radius:var(--radius);
+    padding:10px 12px;
+    font-size:12.5px;
+    color:var(--text);
+    z-index:15;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+  }
+  .pending-bar.show{ display:flex; }
+  .pending-bar button{
+    background:none;
+    border:1px solid var(--yellow);
+    color:var(--yellow);
+    border-radius:4px;
+    padding:6px 10px;
+    font-size:12px;
+    font-family:inherit;
+    font-weight:700;
+    cursor:pointer;
+    white-space:nowrap;
+  }
+
   input[type=file]{ display:none; }
 
   @media (min-width:600px){
@@ -433,6 +462,11 @@
 </main>
 
 <div class="toast" id="toast"></div>
+
+<div class="pending-bar" id="pendingBar">
+  <span id="pendingText"></span>
+  <button type="button" id="retryPendingBtn">Reintentar ahora</button>
+</div>
 
 <div class="send-bar">
   <div class="wrap">
@@ -582,10 +616,65 @@ function refresh(){
 }
 refresh();
 
-/* ---------- envío directo al Apps Script ---------- */
+/* ---------- envío directo al Apps Script (con cola de pendientes sin conexión) ---------- */
 document.getElementById("enviarBtn").addEventListener("click", async () => {
   await enviarTicket();
 });
+document.getElementById("retryPendingBtn").addEventListener("click", reintentarPendientes);
+window.addEventListener("online", reintentarPendientes);
+window.addEventListener("load", () => {
+  actualizarBarraPendientes();
+  reintentarPendientes();
+});
+
+const QUEUE_KEY = "ticketsPendientes_v1";
+
+function generarTicketId(){
+  if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+  return "id-" + Date.now() + "-" + Math.random().toString(16).slice(2);
+}
+
+function leerCola(){
+  try { return JSON.parse(localStorage.getItem(QUEUE_KEY) || "[]"); }
+  catch(e){ return []; }
+}
+function guardarCola(cola){
+  try { localStorage.setItem(QUEUE_KEY, JSON.stringify(cola)); return true; }
+  catch(e){ return false; } // almacenamiento lleno o no disponible
+}
+function agregarACola(payload){
+  const cola = leerCola();
+  cola.push(payload);
+  const ok = guardarCola(cola);
+  actualizarBarraPendientes();
+  return ok;
+}
+function quitarDeCola(ticketId){
+  guardarCola(leerCola().filter(p => p.ticketId !== ticketId));
+  actualizarBarraPendientes();
+}
+function actualizarBarraPendientes(){
+  const cola = leerCola();
+  const bar = document.getElementById("pendingBar");
+  const text = document.getElementById("pendingText");
+  if (cola.length === 0){
+    bar.classList.remove("show");
+  } else {
+    text.textContent = cola.length === 1
+      ? "1 ticket guardado sin enviar — se manda solo al recuperar señal."
+      : cola.length + " tickets guardados sin enviar — se mandan solos al recuperar señal.";
+    bar.classList.add("show");
+  }
+}
+
+async function enviarPayload(payload){
+  const res = await fetch(CONFIG.APPS_SCRIPT_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" }, // evita preflight CORS con Apps Script
+    body: JSON.stringify(payload)
+  });
+  return await res.json();
+}
 
 function fileToBase64(file){
   return new Promise((resolve, reject) => {
@@ -614,6 +703,7 @@ async function enviarTicket(){
   try{
     const photoBase64 = await fileToBase64(state.photoFile);
     const payload = {
+      ticketId: generarTicketId(),
       codigo: state.codigo,
       obra: state.obra,
       categoria: state.categoria,
@@ -625,12 +715,18 @@ async function enviarTicket(){
       photoBase64: photoBase64
     };
 
-    const res = await fetch(CONFIG.APPS_SCRIPT_URL, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" }, // evita preflight CORS con Apps Script
-      body: JSON.stringify(payload)
-    });
-    const data = await res.json();
+    let data;
+    try{
+      data = await enviarPayload(payload);
+    } catch(errRed){
+      // fallo de red real (sin señal / servidor no responde): se guarda para reintentar solo
+      const guardado = agregarACola(payload);
+      showToast(guardado
+        ? "Sin conexión. El ticket se guardó y se enviará solo al recuperar señal."
+        : "Sin conexión y no se pudo guardar localmente (memoria del teléfono llena). Intenta de nuevo en un momento.");
+      if (guardado) resetFormDespuesDeEnvio();
+      return;
+    }
 
     if (data.success){
       showToast("✓ Ticket enviado" + (data.nombre ? " — " + data.nombre : "") + ".");
@@ -639,10 +735,28 @@ async function enviarTicket(){
       showToast("⚠ " + (data.message || "No se pudo enviar. Intenta de nuevo."));
     }
   } catch (err){
-    showToast("⚠ Sin conexión o el servidor no respondió. Intenta de nuevo.");
+    showToast("⚠ Ocurrió un problema al preparar el envío. Intenta de nuevo.");
   } finally {
     setSending(false);
     refresh();
+  }
+}
+
+async function reintentarPendientes(){
+  if (!navigator.onLine) return;
+  const cola = leerCola();
+  if (cola.length === 0) return;
+
+  for (const payload of cola){
+    try{
+      const data = await enviarPayload(payload);
+      quitarDeCola(payload.ticketId);
+      if (!data.success && !data.duplicado){
+        showToast("⚠ Un ticket pendiente no se pudo enviar: " + (data.message || "revisa los datos") + ". Vuelve a capturarlo.");
+      }
+    } catch(err){
+      break; // sigue sin señal — el resto de la cola se reintenta después
+    }
   }
 }
 
