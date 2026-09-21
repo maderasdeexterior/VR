@@ -331,43 +331,56 @@
 <header>
   <div class="wrap">
     <h1>Enviar ticket</h1>
-    <p>Selecciona obra y categoría, toma la foto del ticket y se abre el correo listo para enviar. Menos de 30 segundos.</p>
+    <p>Ingresa tu código, selecciona obra y categoría, toma la foto del ticket y envíalo. Menos de 30 segundos.</p>
   </div>
 </header>
 
 <main class="wrap">
 
-  <!-- PASO 1 · OBRA -->
+  <!-- PASO 1 · CÓDIGO -->
   <section class="step">
     <div class="step-head">
       <span class="step-num">1</span>
+      <span class="step-title">Tu código</span>
+    </div>
+    <p class="step-sub">Se valida al enviar — identifica quién manda el ticket.</p>
+    <div class="field">
+      <label for="codigoInput">Código personal</label>
+      <input id="codigoInput" type="text" autocapitalize="characters" autocomplete="off" placeholder="Ej. ABCD-ME-T26">
+    </div>
+  </section>
+
+  <!-- PASO 2 · OBRA -->
+  <section class="step">
+    <div class="step-head">
+      <span class="step-num">2</span>
       <span class="step-title">Obra</span>
     </div>
     <div id="obraGrid" class="choice-grid"></div>
   </section>
 
-  <!-- PASO 2 · CATEGORÍA -->
+  <!-- PASO 3 · CATEGORÍA -->
   <section class="step">
     <div class="step-head">
-      <span class="step-num">2</span>
+      <span class="step-num">3</span>
       <span class="step-title">Categoría de gasto</span>
     </div>
     <div id="categoriaGrid" class="choice-grid two-col"></div>
   </section>
 
-  <!-- PASO 3 · FORMA DE PAGO -->
+  <!-- PASO 4 · FORMA DE PAGO -->
   <section class="step">
     <div class="step-head">
-      <span class="step-num">3</span>
+      <span class="step-num">4</span>
       <span class="step-title">Forma de pago</span>
     </div>
     <div id="formaPagoGrid" class="choice-grid two-col"></div>
   </section>
 
-  <!-- PASO 4 · MONTO Y NOTA (opcionales) -->
+  <!-- PASO 5 · MONTO Y NOTA (opcionales) -->
   <section class="step">
     <div class="step-head">
-      <span class="step-num">4</span>
+      <span class="step-num">5</span>
       <span class="step-title">Monto y nota</span>
     </div>
     <p class="step-sub">Opcionales — solo si los quieres anotar aquí.</p>
@@ -383,10 +396,10 @@
     </div>
   </section>
 
-  <!-- PASO 5 · FOTO -->
+  <!-- PASO 6 · FOTO -->
   <section class="step">
     <div class="step-head">
-      <span class="step-num">5</span>
+      <span class="step-num">6</span>
       <span class="step-title">Foto del ticket</span>
     </div>
 
@@ -423,20 +436,22 @@
 
 <div class="send-bar">
   <div class="wrap">
-    <button id="enviarBtn" disabled>Enviar por correo</button>
+    <button id="enviarBtn" disabled>Enviar ticket</button>
     <div class="missing-hint" id="missingHint"></div>
-    <div class="planb">
-      <button type="button" id="planBBtn">¿No se abrió el correo? Descargar foto y abrir correo manualmente</button>
-    </div>
   </div>
 </div>
 
 <script>
 /* ============================================================
    BLOQUE DE CONFIGURACIÓN — edita aquí, no más abajo
+   ------------------------------------------------------------
+   APPS_SCRIPT_URL: pega aquí la URL que termina en /exec después
+   de implementar el proyecto de Apps Script (ver instrucciones).
+   El correo destino y los códigos secretos NO van aquí — viven
+   solo dentro del Apps Script, que es privado.
    ============================================================ */
 const CONFIG = {
-  EMAIL_DESTINO: "rodrigo@maderasdeexterior.com",
+  APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbwhP7KKCNoqb4pOjb0SD0QkN7VLK6XZNsrCeril_GopMmpkzKjWaeFB9czMY08DLHUXTA/exec",
 
   OBRAS: [
     "San Bernardo",
@@ -463,6 +478,7 @@ const CONFIG = {
 /* ============================================================ */
 
 const state = {
+  codigo: "",
   obra: null,
   categoria: null,
   formaPago: null,
@@ -494,6 +510,12 @@ function buildChoiceGrid(containerId, options, stateKey){
 buildChoiceGrid("obraGrid", CONFIG.OBRAS, "obra");
 buildChoiceGrid("categoriaGrid", CONFIG.CATEGORIAS, "categoria");
 buildChoiceGrid("formaPagoGrid", CONFIG.FORMAS_PAGO, "formaPago");
+
+/* ---------- código ---------- */
+document.getElementById("codigoInput").addEventListener("input", e => {
+  state.codigo = e.target.value.trim();
+  refresh();
+});
 
 /* ---------- monto / nota ---------- */
 document.getElementById("montoInput").addEventListener("input", e => {
@@ -540,6 +562,7 @@ function refresh(){
     (state.obra || state.categoria || state.formaPago) ? `Asunto: ${subject}` : "Asunto: —";
 
   const missing = [];
+  if (!state.codigo) missing.push("código");
   if (!state.obra) missing.push("obra");
   if (!state.categoria) missing.push("categoría");
   if (!state.formaPago) missing.push("forma de pago");
@@ -559,60 +582,87 @@ function refresh(){
 }
 refresh();
 
-/* ---------- envío ---------- */
+/* ---------- envío directo al Apps Script ---------- */
 document.getElementById("enviarBtn").addEventListener("click", async () => {
-  await intentarEnvio();
-});
-document.getElementById("planBBtn").addEventListener("click", () => {
-  planB();
+  await enviarTicket();
 });
 
-async function intentarEnvio(){
-  if (!state.photoFile) return;
-  const subject = buildSubject();
-  const shareData = {
-    files: [state.photoFile],
-    title: subject,
-    text: subject
-  };
-
-  try{
-    if (navigator.canShare && navigator.canShare({ files: shareData.files })){
-      await navigator.share(shareData);
-      showToast("Se abrió el menú para compartir. Elige tu app de correo.");
-      return;
-    }
-  } catch (err){
-    if (err && err.name === "AbortError") return; // el usuario canceló, no es error
-    // si falla, cae al plan B
-  }
-  planB();
+function fileToBase64(file){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(",")[1]); // quita el prefijo data:...;base64,
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 }
 
-function planB(){
-  if (!state.photoFile){
-    showToast("Primero toma o elige la foto del ticket.");
+function setSending(isSending){
+  const btn = document.getElementById("enviarBtn");
+  btn.disabled = isSending;
+  btn.textContent = isSending ? "Enviando…" : "Enviar ticket";
+}
+
+async function enviarTicket(){
+  if (!state.codigo || !state.obra || !state.categoria || !state.formaPago || !state.photoFile) return;
+
+  if (!CONFIG.APPS_SCRIPT_URL || CONFIG.APPS_SCRIPT_URL.startsWith("PEGA_AQUI")){
+    showToast("Falta configurar la URL del Apps Script en CONFIG.");
     return;
   }
-  const subject = buildSubject();
 
-  // 1) descargar la foto
-  const a = document.createElement("a");
-  a.href = state.photoUrl;
-  a.download = "ticket-" + Date.now() + ".jpg";
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
+  setSending(true);
+  try{
+    const photoBase64 = await fileToBase64(state.photoFile);
+    const payload = {
+      codigo: state.codigo,
+      obra: state.obra,
+      categoria: state.categoria,
+      formaPago: state.formaPago,
+      monto: state.monto,
+      nota: state.nota,
+      filename: state.photoFile.name || "ticket.jpg",
+      mimeType: state.photoFile.type || "image/jpeg",
+      photoBase64: photoBase64
+    };
 
-  // 2) abrir correo prellenado (sin adjunto automático — hay que adjuntarlo a mano)
-  const body = "Adjunta aquí la foto del ticket que se acaba de descargar a tu galería.";
-  const mailto = `mailto:${CONFIG.EMAIL_DESTINO}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    const res = await fetch(CONFIG.APPS_SCRIPT_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" }, // evita preflight CORS con Apps Script
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
 
-  setTimeout(() => {
-    window.location.href = mailto;
-  }, 400);
+    if (data.success){
+      showToast("✓ Ticket enviado" + (data.nombre ? " — " + data.nombre : "") + ".");
+      resetFormDespuesDeEnvio();
+    } else {
+      showToast("⚠ " + (data.message || "No se pudo enviar. Intenta de nuevo."));
+    }
+  } catch (err){
+    showToast("⚠ Sin conexión o el servidor no respondió. Intenta de nuevo.");
+  } finally {
+    setSending(false);
+    refresh();
+  }
+}
 
-  showToast("Foto descargada. Se abre tu correo — adjunta la foto antes de enviar.");
+function resetFormDespuesDeEnvio(){
+  // conserva el código (misma persona suele mandar varios tickets seguidos)
+  state.obra = null;
+  state.categoria = null;
+  state.formaPago = null;
+  state.monto = "";
+  state.nota = "";
+  state.photoFile = null;
+  if (state.photoUrl) URL.revokeObjectURL(state.photoUrl);
+  state.photoUrl = null;
+
+  document.querySelectorAll(".choice-btn.selected").forEach(b => b.classList.remove("selected"));
+  document.getElementById("montoInput").value = "";
+  document.getElementById("notaInput").value = "";
+  document.getElementById("previewBox").classList.remove("show");
+  inputCamara.value = "";
+  inputGaleria.value = "";
 }
 
 function showToast(msg){
